@@ -1,29 +1,52 @@
 <!doctype html>
 <html lang="fr">
+
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Épure Auto — Espace pro</title>
   <link rel="stylesheet" href="styles.css">
 </head>
+
 <body class="admin-body">
-  <header class="site-header"><a class="brand" href="index.html"><span class="brand-mark">É</span><span>ÉPURE AUTO<span class="brand-dot">.</span></span></a><a class="btn btn-primary btn-small" href="index.html">Voir le site</a></header>
+  <header class="site-header"><a class="brand" href="index.html"><span class="brand-mark">É</span><span>ÉPURE AUTO<span
+          class="brand-dot">.</span></span></a><a class="btn btn-primary btn-small" href="index.html">Voir le site</a>
+  </header>
   <main class="admin-wrap">
     <div class="section-label">ESPACE PROFESSIONNEL</div>
     <h1>Planning & réservations</h1>
-    <p style="color:var(--muted)">Les demandes arrivent ici. Vérifiez l'état du véhicule et les photos, puis confirmez ou refusez. La confirmation génère un paiement Stripe et l'envoie au client par e-mail.</p>
+    <p style="color:var(--muted)">Les demandes arrivent ici. Vérifiez l'état du véhicule et les photos, puis confirmez
+      ou refusez. La confirmation génère un paiement Stripe et l'envoie au client par e-mail.</p>
     <div class="admin-grid">
       <section class="admin-card">
         <h3>Bloquer un créneau</h3>
         <p class="empty">Pour les cours, congés, indisponibilités ou rendez-vous personnels.</p>
         <label>Date<input type="date" id="blockDate"></label>
-        <label>Heure<select id="blockTime"><option>09:00</option><option>10:30</option><option>12:00</option><option>13:00</option><option>14:00</option><option>14:30</option><option>15:30</option><option>17:00</option></select></label>
+        <label>Heure<select id="blockTime">
+            <option>09:00</option>
+            <option>10:30</option>
+            <option>12:00</option>
+            <option>13:00</option>
+            <option>14:00</option>
+            <option>14:30</option>
+            <option>15:30</option>
+            <option>17:00</option>
+          </select></label>
         <button class="btn btn-primary" id="blockBtn">Bloquer ce créneau</button>
       </section>
-      <section class="admin-card"><h3>Créneaux bloqués</h3><ul class="admin-list" id="blocks"></ul></section>
-      <section class="admin-card" style="grid-column:1/-1"><div style="display:flex;justify-content:space-between;gap:15px;align-items:center"><h3>Réservations</h3><button class="btn btn-secondary" id="clearBtn">Réinitialiser la démo</button></div><ul class="admin-list" id="bookings"></ul></section>
+      <section class="admin-card">
+        <h3>Créneaux bloqués</h3>
+        <ul class="admin-list" id="blocks"></ul>
+      </section>
+      <section class="admin-card" style="grid-column:1/-1">
+        <div style="display:flex;justify-content:space-between;gap:15px;align-items:center">
+          <h3>Réservations</h3><button class="btn btn-secondary" id="clearBtn">Réinitialiser la démo</button>
+        </div>
+        <ul class="admin-list" id="bookings"></ul>
+      </section>
     </div>
   </main>
   <script src="admin.js"></script>
 </body>
+
 </html>

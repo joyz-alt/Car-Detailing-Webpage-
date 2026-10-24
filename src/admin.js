@@ -1,9 +1,9 @@
 const $ = s => document.querySelector(s);
 let ADMIN_KEY = localStorage.getItem('epure_admin_key') || '';
 function headers(json = false) {
-  const h = {}; 
-  
-  if (json) 
+  const h = {};
+
+  if (json)
     h['Content-Type'] = 'application/json';
 
   if (ADMIN_KEY)
@@ -31,7 +31,29 @@ function renderBookings(rs) {
     return;
   }
 
-  box.innerHTML = rs.sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time)).map(r => `<li class="booking-admin-item"><div><strong>${r.date} · ${r.time}</strong> <span class="status status-${r.status}">${labelStatus(r.status)}</span><br>${r.firstName} ${r.lastName} · ${r.service} · ${r.vehicle}<br><span class="empty">${r.phone} · ${r.email}<br>${r.address}<br>💧 Eau : <strong>${r.water || 'Non renseigné'}</strong> · ⚡ Électricité : <strong>${r.electricity || 'Non renseigné'}</strong><br>État : ${r.condition}${r.note ? ' · ' + r.note : ''}</span>${r.photos?.length ? `<br><span class="photo-count">📷 ${r.photos.length} photo(s) reçue(s)</span>` : ''}</div><div class="admin-actions">${r.status === 'pending' ? `<button class="btn btn-primary btn-small" onclick="sendPayment('${r.id}')">Confirmer & envoyer paiement</button><button class="btn btn-secondary btn-small" onclick="decline('${r.id}')">Refuser</button>` : ''}${r.paymentUrl ? `<a class="btn btn-secondary btn-small" href="${r.paymentUrl}" target="_blank">Lien paiement</a>` : ''}</div></li>`).join('');
+  box.innerHTML = rs.sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time)).map(r => `<li class="booking-admin-item"><div><strong>
+    
+    ${r.date} · ${r.time}</strong> <span class="status status-${r.status}">${labelStatus(r.status)}</span><br>
+    
+    ${r.firstName} ${r.lastName} · ${r.service} · ${r.vehicle}<br><span class="empty">${r.phone} · ${r.email}<br>
+
+    ${r.address}<br>💧 Eau : <strong>
+    
+    ${r.water || 'Non renseigné'}</strong> · ⚡ Électricité : <strong>
+    ${r.electricity || 'Non renseigné'}</strong><br>État : 
+    
+    ${r.condition}
+    ${r.note ? ' · ' + r.note : ''}</span>
+
+    ${r.photos?.length ? `<br><span class="photo-count">📷 
+      ${r.photos.length} photo(s) reçue(s)</span>` : ''}</div><div class="admin-actions">
+    
+    ${r.status === 'pending' ? `<button class="btn btn-primary btn-small" onclick="sendPayment('
+      ${r.id}')">Confirmer & envoyer paiement</button><button class="btn btn-secondary btn-small" onclick="decline('
+      ${r.id}')">Refuser</button>` : ''}
+
+    ${r.paymentUrl ? `<a class="btn btn-secondary btn-small" href="
+      ${r.paymentUrl}" target="_blank">Lien paiement</a>` : ''}</div></li>`).join('');
 }
 function labelStatus(s) {
   return {
@@ -104,5 +126,11 @@ $('#blockBtn').onclick = async () => {
   }
 };
 $('#clearBtn').onclick = () => alert('La réinitialisation complète est volontairement désactivée en production. Supprimez les réservations individuellement ou videz les fichiers data côté serveur.');
-if (!ADMIN_KEY) { ADMIN_KEY = prompt('Clé administrateur (ADMIN_KEY) :') || ''; if (ADMIN_KEY) localStorage.setItem('epure_admin_key', ADMIN_KEY); }
+if (!ADMIN_KEY) { 
+  ADMIN_KEY = prompt('Clé administrateur (ADMIN_KEY) :') || ''; 
+  
+  if (ADMIN_KEY) 
+    localStorage.setItem('epure_admin_key', ADMIN_KEY); 
+  
+}
 render();

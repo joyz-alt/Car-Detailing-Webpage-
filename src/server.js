@@ -7,9 +7,10 @@ const Stripe = require('stripe');
 const nodemailer = require('nodemailer');
 
 const app = express();
-const PORT = process.env.PORT || 4242;
-const DATA_DIR = path.join(__dirname, 'data');
-const UPLOAD_DIR = path.join(__dirname, 'uploads');
+const PORT = process.env.PORT || 3000;
+const ROOT_DIR = path.join(__dirname, '..');
+const DATA_DIR = path.join(ROOT_DIR, 'data');
+const UPLOAD_DIR = path.join(ROOT_DIR, 'uploads');
 fs.mkdirSync(DATA_DIR, { recursive: true });
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
@@ -163,8 +164,19 @@ app.post('/api/bookings', async (req, res) => {
   bookings.push(booking);
   write(BOOKINGS_FILE, bookings);
 
-  await sendMail(process.env.ADMIN_EMAIL || 'epureauto@gmail.com', `Épure Auto — nouvelle demande ${booking.id}`, `<h2>Nouvelle demande de réservation</h2><p><strong>${firstName} ${lastName}</strong><br>${phone}<br>${email}</p><p><strong>${service}</strong> · ${vehicle}<br>${date} à ${time}<br>${address}</p><p>💧 Eau sur place : <strong>${water}</strong><br>⚡ Électricité sur place : <strong>${electricity}</strong><br>État : <strong>${condition}</strong></p><p>Photos : ${safePhotos.length}</p>${note ? `<p>Note : ${note}</p>` : ''}<p><a href="${process.env.PUBLIC_URL || `http://localhost:${PORT}`}/admin.html">Ouvrir l'espace pro</a></p>`).catch(console.error);
-  res.status(201).json({ booking: publicBooking(booking), message: 'Demande envoyée. Votre créneau sera confirmé après vérification.' });
+  await sendMail(process.env.ADMIN_EMAIL || 'epureauto@gmail.com', 
+    `Épure Auto — nouvelle demande ${booking.id}`, `<h2>Nouvelle demande de réservation</h2>
+    <p><strong>${firstName} ${lastName}</strong><br>${phone}<br>${email}</p>
+    <p><strong>${service}</strong> · ${vehicle}<br>${date} à ${time}<br>${address}</p>
+    <p>💧 Eau sur place : <strong>${water}</strong><br>⚡ Électricité sur place : <strong>${electricity}</strong><br>État : <strong>${condition}</strong></p>
+    <p>Photos : ${safePhotos.length}</p>
+    ${note ? `<p>Note : ${note}</p>` : ''}
+    <p><a href="${process.env.PUBLIC_URL || `https://epure-auto.com:${PORT}`}/admin.html">Ouvrir l'espace pro</a></p>`).catch(console.error);
+  
+    res.status(201).json({ 
+    booking: publicBooking(booking), 
+    message: 'Demande envoyée. Votre créneau sera confirmé après vérification.' 
+  });
 });
 
 function adminGuard(req, res, next) {
@@ -205,7 +217,7 @@ app.post('/api/admin/bookings/:id/payment', adminGuard, async (req, res) => {
   const b = bookings.find(x => x.id === req.params.id);
   if (!b) return res.status(404).json({ error: 'Réservation introuvable.' });
   if (b.status !== 'pending') return res.status(400).json({ error: 'Cette réservation ne peut pas être envoyée au paiement.' });
-  const base = process.env.PUBLIC_URL || `http://localhost:${PORT}`;
+  const base = process.env.PUBLIC_URL || `https://epure-auto.com:${PORT}`;
 
   const session = await stripe.checkout.sessions.create({
     mode: 'payment',
@@ -226,4 +238,4 @@ app.post('/api/admin/bookings/:id/payment', adminGuard, async (req, res) => {
   res.json({ ok: true, paymentUrl: session.url, emailSent: sent });
 });
 
-app.listen(PORT, () => console.log(`Épure Auto server running on http://localhost:${PORT}`));
+app.listen(PORT, () => console.log(`Épure Auto server running on https://epure-auto.com:${PORT}`));
