@@ -42,9 +42,11 @@ const pool = new Pool({
 const stripe = process.env.STRIPE_SECRET_KEY ? Stripe(process.env.STRIPE_SECRET_KEY) : null;
 const r2Configured = Boolean(process.env.R2_ACCOUNT_ID && process.env.R2_ACCESS_KEY_ID &&
   process.env.R2_SECRET_ACCESS_KEY && process.env.R2_BUCKET);
+const r2Endpoint = 'https://' + process.env.R2_ACCOUNT_ID +
+  (process.env.R2_JURISDICTION ? '.' + process.env.R2_JURISDICTION : '') + '.r2.cloudflarestorage.com';
 const r2 = r2Configured ? new S3Client({
   region: 'auto',
-  endpoint: 'https://' + process.env.R2_ACCOUNT_ID + '.r2.cloudflarestorage.com',
+  endpoint: r2Endpoint,
   credentials: {
     accessKeyId: process.env.R2_ACCESS_KEY_ID,
     secretAccessKey: process.env.R2_SECRET_ACCESS_KEY
@@ -427,10 +429,9 @@ app.delete('/api/admin/blocks/:id', adminGuard, asyncHandler(async (req, res) =>
 app.post('/api/admin/bookings/:id/decline', adminGuard, asyncHandler(async (req, res) => {
   const booking = await getBooking(pool, req.params.id, false);
   if (!booking) return res.status(404).json({ error: 'Réservation introuvable.' });
-  if (booking.status === 'confirmed') return res.status(409).json({ error: 'Une réservation payée ne peut pas être refusée ici.' });
-  if (booking.status === 'declined') return res.json({ ok: true });
+  if (booking.status !== 'pending') return res.status(409).json({ error: 'Seule une demande en attente peut être refusée.' });
   const changed = await pool.query(
-    'UPDATE bookings SET status = \'declined\' WHERE id = $1 AND status IN (\'pending\', \'awaiting_payment\')',
+    'UPDATE bookings SET status = \'declined\' WHERE id = $1 AND status = \'pending\'',
     [req.params.id]
   );
   if (!changed.rowCount) return res.status(409).json({ error: 'Le statut a changé. Actualisez la page.' });
