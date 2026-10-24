@@ -36,7 +36,7 @@
 - Add the environment variables above in Render's dashboard.
 - Use a paid/managed PostgreSQL database and configure backups.
 - Do not rely on the app filesystem for booking data or uploads; photos are in private R2 and records are in PostgreSQL.
-- Configure the Stripe webhook URL as `https://YOUR-DOMAIN/api/stripe/webhook` and subscribe to `checkout.session.completed`.
+- Configure the Stripe webhook URL as `https://YOUR-DOMAIN/api/stripe/webhook` and subscribe to `checkout.session.completed` and `checkout.session.expired`.
 - First test with the Render service URL, then connect the Cloudflare domain.
 
 ## Before using real customers
@@ -44,3 +44,12 @@
 - If any existing bookings exist locally, export/transfer them before switching production traffic.
 - Test that unauthenticated calls to `/api/admin/*` return 401, that files cannot be accessed via guessed object keys, and that payment only changes a booking to confirmed after a verified Stripe webhook.
 - Review privacy policy, legal notices, retention/deletion practices, and consent/necessity for customer vehicle photos before launch.
+
+
+## Important notes
+- Copy .env.example to .env locally and fill in your own values; never commit the real .env.
+- This branch uses multipart uploads. Photo files are never embedded in JSON requests.
+- R2 objects remain private. The admin API returns photo links signed for 10 minutes; access requires the admin key.
+- PostgreSQL and R2 are required for production bookings with photos. A booking without photos can be submitted if R2 is not configured, but configure R2 before enabling photo uploads.
+- The schema includes payment webhook idempotency. Configure both checkout.session.completed and checkout.session.expired events.
+- package-lock.json will need regenerating after the dependency changes: run npm install in the repository root and commit the updated lockfile.
