@@ -177,19 +177,7 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
       [event.id, event.type]
     );
     if (!recorded.rowCount) {
-      if (event.type === 'checkout.session.expired') {
-      const session = event.data.object;
-      const booking = session.metadata && session.metadata.bookingId
-        ? await getBooking(client, session.metadata.bookingId, true) : null;
-      if (booking && booking.status === 'awaiting_payment' && booking.stripeSessionId === session.id) {
-        await client.query(
-          'UPDATE bookings SET status = \'pending\', stripe_session_id = NULL, payment_url = NULL WHERE id = $1',
-          [booking.id]
-        );
-      }
-    }
-
-    await client.query('COMMIT');
+      await client.query('COMMIT');
       return res.json({ received: true, duplicate: true });
     }
 
@@ -213,9 +201,22 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
         }
       }
     }
+
+    if (event.type === 'checkout.session.expired') {
+      const session = event.data.object;
+      const booking = session.metadata && session.metadata.bookingId
+        ? await getBooking(client, session.metadata.bookingId, true) : null;
+      if (booking && booking.status === 'awaiting_payment' && booking.stripeSessionId === session.id) {
+        await client.query(
+          'UPDATE bookings SET status = \'pending\', stripe_session_id = NULL, payment_url = NULL WHERE id = $1',
+          [booking.id]
+        );
+      }
+    }
+
     await client.query('COMMIT');
   } catch (e) {
-    await client.query('ROLLBACK');
+    await client.query('ROLLBACK').catch(() => {});
     console.error('[STRIPE WEBHOOK]', e.message);
     return res.status(400).send('Le webhook n’a pas pu être traité.');
   } finally { client.release(); }
