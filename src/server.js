@@ -13,6 +13,10 @@ const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
 const ADMIN_KEY = process.env.ADMIN_KEY || '';
+if (ADMIN_KEY && ADMIN_KEY.length < 32) {
+  console.error('ADMIN_KEY must be at least 32 characters long.');
+  process.exit(1);
+}
 const MAX_PHOTOS = 5;
 const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
 const ACTIVE_STATUSES = ['pending', 'awaiting_payment', 'confirmed'];
@@ -74,6 +78,17 @@ function parisToday() {
     .formatToParts(new Date());
   const p = Object.fromEntries(parts.map(x => [x.type, x.value]));
   return p.year + '-' + p.month + '-' + p.day;
+}
+function slotMinutes(time) {
+  const parts = String(time).split(':').map(Number);
+  return parts[0] * 60 + parts[1];
+}
+function parisMinutesNow() {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Europe/Paris', hour: '2-digit', minute: '2-digit', hourCycle: 'h23'
+  }).formatToParts(new Date());
+  const p = Object.fromEntries(parts.map(x => [x.type, x.value]));
+  return Number(p.hour) * 60 + Number(p.minute);
 }
 function constantTimeEquals(a, b) {
   const left = Buffer.from(String(a || ''), 'utf8'), right = Buffer.from(String(b || ''), 'utf8');
@@ -277,7 +292,8 @@ app.get('/api/availability', asyncHandler(async (req, res) => {
         'AND block_time + interval \'1 hour\' > $2::time LIMIT 1',
         [date, time, duration]
       );
-      slots.push({ time, available: booked.rowCount === 0 && blocked.rowCount === 0 });
+      const isPast = date === parisToday() && slotMinutes(time) <= parisMinutesNow();
+      slots.push({ time, available: !isPast && booked.rowCount === 0 && blocked.rowCount === 0 });
     }
     res.json({ slots });
   } finally { client.release(); }
@@ -310,6 +326,7 @@ app.post('/api/bookings', upload.array('photos', MAX_PHOTOS), asyncHandler(async
   }
   if (!isValidDate(date) || date < parisToday()) return res.status(400).json({ error: 'La date de réservation est invalide.' });
   if (!SLOTS.includes(time)) return res.status(400).json({ error: 'Créneau invalide.' });
+  if (date === parisToday() && slotMinutes(time) <= parisMinutesNow()) return res.status(400).json({ error: 'Ce créneau est déjà passé.' });
   if (files.length && !r2) return res.status(503).json({ error: 'Le stockage des photos n’est pas configuré. Configurez R2 avant d’envoyer des photos.' });
 
   const checkedFiles = [];
@@ -439,7 +456,7 @@ app.post('/api/admin/bookings/:id/payment', adminGuard, asyncHandler(async (req,
       success_url: publicBaseUrl() + '/success.html?booking=' + encodeURIComponent(booking.id),
       cancel_url: publicBaseUrl() + '/reservation-annulee.html?booking=' + encodeURIComponent(booking.id),
       expires_at: Math.floor(Date.now() / 1000) + 30 * 60
-    }, { idempotencyKey: 'epure-booking-payment-' + booking.id });
+    });
 
     await client.query(
       'UPDATE bookings SET status = \'awaiting_payment\', stripe_session_id = $2, payment_url = $3 WHERE id = $1',
