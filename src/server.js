@@ -42,7 +42,6 @@ const r2Configured = Boolean(process.env.R2_ACCOUNT_ID && process.env.R2_ACCESS_
 const r2 = r2Configured ? new S3Client({
   region: 'auto',
   endpoint: 'https://' + process.env.R2_ACCOUNT_ID + '.r2.cloudflarestorage.com',
-  forcePathStyle: true,
   credentials: {
     accessKeyId: process.env.R2_ACCESS_KEY_ID,
     secretAccessKey: process.env.R2_SECRET_ACCESS_KEY
@@ -178,7 +177,19 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
       [event.id, event.type]
     );
     if (!recorded.rowCount) {
-      await client.query('COMMIT');
+      if (event.type === 'checkout.session.expired') {
+      const session = event.data.object;
+      const booking = session.metadata && session.metadata.bookingId
+        ? await getBooking(client, session.metadata.bookingId, true) : null;
+      if (booking && booking.status === 'awaiting_payment' && booking.stripeSessionId === session.id) {
+        await client.query(
+          'UPDATE bookings SET status = \\'pending\\', stripe_session_id = NULL, payment_url = NULL WHERE id = $1',
+          [booking.id]
+        );
+      }
+    }
+
+    await client.query('COMMIT');
       return res.json({ received: true, duplicate: true });
     }
 
@@ -343,7 +354,7 @@ app.post('/api/bookings', upload.array('photos', MAX_PHOTOS), asyncHandler(async
     throw e;
   } finally { client.release(); }
 
-  await sendMail(process.env.ADMIN_EMAIL || '', 'Épure Auto — nouvelle demande ' + id,
+  await sendMail(process.env.ADMIN_EMAIL || 'epureauto@gmail.com', 'Épure Auto — nouvelle demande ' + id,
     '<h2>Nouvelle demande de réservation</h2><p><strong>' + escapeHtml(firstName) + ' ' + escapeHtml(lastName) +
     '</strong><br>' + escapeHtml(phone) + '<br>' + escapeHtml(email) + '</p><p><strong>' + escapeHtml(service) +
     '</strong> · ' + escapeHtml(vehicle) + '<br>' + escapeHtml(date) + ' à ' + escapeHtml(time) + '<br>' +
@@ -414,6 +425,7 @@ app.post('/api/admin/bookings/:id/payment', adminGuard, asyncHandler(async (req,
     session = await stripe.checkout.sessions.create({
       mode: 'payment',
       customer_email: booking.email,
+      payment_method_types: ['card'],
       line_items: [{
         price_data: {
           currency: 'eur',
