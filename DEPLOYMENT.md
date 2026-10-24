@@ -15,6 +15,7 @@
    - `DATABASE_URL` — PostgreSQL connection URL
    - `ADMIN_KEY` — long random secret, at least 32 characters
    - `R2_ACCOUNT_ID`
+   - Optional `R2_JURISDICTION` — set to `eu` only if the bucket was created with the EU jurisdiction; otherwise leave blank
    - `R2_ACCESS_KEY_ID`
    - `R2_SECRET_ACCESS_KEY`
    - `R2_BUCKET`
@@ -40,8 +41,7 @@
 - First test with the Render service URL, then connect the Cloudflare domain.
 
 ## Before using real customers
-- Keep the old JSON files as a backup until you confirm they contain no required bookings. This branch does not automatically import JSON data into PostgreSQL.
-- If any existing bookings exist locally, export/transfer them before switching production traffic.
+- Before switching, back up any local JSON files from the previous version. This branch does not automatically import old JSON bookings or base64 photos into PostgreSQL/R2. If there are existing bookings, they must be migrated before production traffic is switched.
 - Test that unauthenticated calls to `/api/admin/*` return 401, that files cannot be accessed via guessed object keys, and that payment only changes a booking to confirmed after a verified Stripe webhook.
 - Review privacy policy, legal notices, retention/deletion practices, and consent/necessity for customer vehicle photos before launch.
 
