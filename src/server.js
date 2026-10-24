@@ -183,7 +183,7 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
         ? await getBooking(client, session.metadata.bookingId, true) : null;
       if (booking && booking.status === 'awaiting_payment' && booking.stripeSessionId === session.id) {
         await client.query(
-          'UPDATE bookings SET status = \\'pending\\', stripe_session_id = NULL, payment_url = NULL WHERE id = $1',
+          'UPDATE bookings SET status = \'pending\', stripe_session_id = NULL, payment_url = NULL WHERE id = $1',
           [booking.id]
         );
       }
