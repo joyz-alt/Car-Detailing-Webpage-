@@ -66,7 +66,7 @@ function escapeHtml(value) {
 }
 function text(value, max) { return String(value == null ? '' : value).trim().slice(0, max || 500); }
 function isValidDate(value) {
-  if (typeof value !== 'string' || !/^\\d{4}-\\d{2}-\\d{2}$/.test(value)) return false;
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
   const d = new Date(value + 'T00:00:00.000Z');
   return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === value;
 }
@@ -85,7 +85,7 @@ function adminGuard(req, res, next) {
   if (!constantTimeEquals(req.headers['x-admin-key'], ADMIN_KEY)) return res.status(401).json({ error: 'Clé administrateur incorrecte ou absente.' });
   next();
 }
-function publicBaseUrl() { return String(process.env.PUBLIC_URL || 'http://localhost:3000').replace(/\\/+$/, ''); }
+function publicBaseUrl() { return String(process.env.PUBLIC_URL || 'http://localhost:3000').replace(/\/+$/, ''); }
 function getTransporter() {
   if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) return null;
   return nodemailer.createTransport({
@@ -147,15 +147,15 @@ async function isAvailableInTransaction(client, date, time, service) {
   await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [date]);
   const booked = await client.query(
     'SELECT 1 FROM bookings WHERE booking_date = $1 AND status = ANY($2::text[]) ' +
-    'AND booking_time < ($3::time + ($4 * interval \\'1 minute\\')) ' +
-    'AND booking_time + duration_minutes * interval \\'1 minute\\' > $3::time LIMIT 1',
+    'AND booking_time < ($3::time + ($4 * interval \'1 minute\')) ' +
+    'AND booking_time + duration_minutes * interval \'1 minute\' > $3::time LIMIT 1',
     [date, ACTIVE_STATUSES, time, duration]
   );
   if (booked.rowCount) return false;
   const blocked = await client.query(
     'SELECT 1 FROM booking_blocks WHERE block_date = $1 ' +
-    'AND block_time < ($2::time + ($3 * interval \\'1 minute\\')) ' +
-    'AND block_time + interval \\'1 hour\\' > $2::time LIMIT 1',
+    'AND block_time < ($2::time + ($3 * interval \'1 minute\')) ' +
+    'AND block_time + interval \'1 hour\' > $2::time LIMIT 1',
     [date, time, duration]
   );
   return blocked.rowCount === 0;
@@ -193,9 +193,9 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
         }
         if (booking.status === 'awaiting_payment' || booking.status === 'confirmed') {
           const updated = await client.query(
-            'UPDATE bookings SET status = \\'confirmed\\', paid_at = COALESCE(paid_at, NOW()), ' +
+            'UPDATE bookings SET status = \'confirmed\', paid_at = COALESCE(paid_at, NOW()), ' +
             'stripe_payment_intent_id = COALESCE($2, stripe_payment_intent_id) ' +
-            'WHERE id = $1 AND status <> \\'declined\\' RETURNING id',
+            'WHERE id = $1 AND status <> \'declined\' RETURNING id',
             [booking.id, typeof session.payment_intent === 'string' ? session.payment_intent : null]
           );
           if (updated.rowCount && booking.status !== 'confirmed') confirmation = booking;
@@ -255,14 +255,14 @@ app.get('/api/availability', asyncHandler(async (req, res) => {
       const duration = SERVICES[service].durationMinutes;
       const booked = await client.query(
         'SELECT 1 FROM bookings WHERE booking_date = $1 AND status = ANY($2::text[]) ' +
-        'AND booking_time < ($3::time + ($4 * interval \\'1 minute\\')) ' +
-        'AND booking_time + duration_minutes * interval \\'1 minute\\' > $3::time LIMIT 1',
+        'AND booking_time < ($3::time + ($4 * interval \'1 minute\')) ' +
+        'AND booking_time + duration_minutes * interval \'1 minute\' > $3::time LIMIT 1',
         [date, ACTIVE_STATUSES, time, duration]
       );
       const blocked = await client.query(
         'SELECT 1 FROM booking_blocks WHERE block_date = $1 ' +
-        'AND block_time < ($2::time + ($3 * interval \\'1 minute\\')) ' +
-        'AND block_time + interval \\'1 hour\\' > $2::time LIMIT 1',
+        'AND block_time < ($2::time + ($3 * interval \'1 minute\')) ' +
+        'AND block_time + interval \'1 hour\' > $2::time LIMIT 1',
         [date, time, duration]
       );
       slots.push({ time, available: booked.rowCount === 0 && blocked.rowCount === 0 });
@@ -292,7 +292,7 @@ app.post('/api/bookings', upload.array('photos', MAX_PHOTOS), asyncHandler(async
       !email || !address || !water || !electricity || !condition) {
     return res.status(400).json({ error: 'Merci de compléter tous les champs obligatoires.' });
   }
-  if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) return res.status(400).json({ error: 'Adresse e-mail invalide.' });
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'Adresse e-mail invalide.' });
   if (!['Oui', 'Non'].includes(water) || !['Oui', 'Non'].includes(electricity)) {
     return res.status(400).json({ error: 'Veuillez préciser si l’eau et l’électricité sont disponibles.' });
   }
@@ -326,7 +326,7 @@ app.post('/api/bookings', upload.array('photos', MAX_PHOTOS), asyncHandler(async
     const details = SERVICES[service];
     await client.query(
       'INSERT INTO bookings (id, service, vehicle, booking_date, booking_time, first_name, last_name, phone, email, address, water, electricity, vehicle_condition, note, amount_eur, duration_minutes, duration_label, status) ' +
-      'VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,\\'pending\\')',
+      'VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,\'pending\')',
       [id, service, vehicle, date, time, firstName, lastName, phone, email, address, water, electricity, condition, note,
        details.amount, details.durationMinutes, details.durationLabel]
     );
@@ -365,7 +365,7 @@ app.get('/api/admin/bookings', adminGuard, asyncHandler(async (req, res) => {
   res.json(await Promise.all(result.rows.map(async b => ({ ...b, photos: await photoList(b.id) }))));
 }));
 app.get('/api/admin/blocks', adminGuard, asyncHandler(async (req, res) => {
-  const r = await pool.query('SELECT id, block_date::text AS date, to_char(block_time, \\'HH24:MI\\') AS time FROM booking_blocks ORDER BY block_date, block_time');
+  const r = await pool.query('SELECT id, block_date::text AS date, to_char(block_time, \'HH24:MI\') AS time FROM booking_blocks ORDER BY block_date, block_time');
   res.json(r.rows);
 }));
 app.post('/api/admin/blocks', adminGuard, asyncHandler(async (req, res) => {
@@ -388,7 +388,7 @@ app.post('/api/admin/bookings/:id/decline', adminGuard, asyncHandler(async (req,
   if (booking.status === 'confirmed') return res.status(409).json({ error: 'Une réservation payée ne peut pas être refusée ici.' });
   if (booking.status === 'declined') return res.json({ ok: true });
   const changed = await pool.query(
-    'UPDATE bookings SET status = \\'declined\\' WHERE id = $1 AND status IN (\\'pending\\', \\'awaiting_payment\\')',
+    'UPDATE bookings SET status = \'declined\' WHERE id = $1 AND status IN (\'pending\', \'awaiting_payment\')',
     [req.params.id]
   );
   if (!changed.rowCount) return res.status(409).json({ error: 'Le statut a changé. Actualisez la page.' });
@@ -429,7 +429,7 @@ app.post('/api/admin/bookings/:id/payment', adminGuard, asyncHandler(async (req,
     }, { idempotencyKey: 'epure-booking-payment-' + booking.id });
 
     await client.query(
-      'UPDATE bookings SET status = \\'awaiting_payment\\', stripe_session_id = $2, payment_url = $3 WHERE id = $1',
+      'UPDATE bookings SET status = \'awaiting_payment\', stripe_session_id = $2, payment_url = $3 WHERE id = $1',
       [booking.id, session.id, session.url]
     );
     await client.query('COMMIT');
