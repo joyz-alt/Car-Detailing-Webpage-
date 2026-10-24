@@ -24,6 +24,12 @@ function money(n) {
   return `${n} €`;
 }
 
+function escapeHtml(value) {
+  return String(value == null ? '' : value).replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  })[c]);
+}
+
 function renderBookings(rs) {
   const box = $('#bookings');
   if (!rs.length) {
@@ -31,30 +37,40 @@ function renderBookings(rs) {
     return;
   }
 
-  box.innerHTML = rs.sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time)).map(r => `<li class="booking-admin-item"><div><strong>
-    
-    ${r.date} · ${r.time}</strong> <span class="status status-${r.status}">${labelStatus(r.status)}</span><br>
-    
-    ${r.firstName} ${r.lastName} · ${r.service} · ${r.vehicle}<br><span class="empty">${r.phone} · ${r.email}<br>
+  box.innerHTML = rs.map(r => {
+    const photos = (r.photos || []).filter(p => p && p.url).map(p =>
+      '<a href="' + escapeHtml(p.url) + '" target="_blank" rel="noopener noreferrer" title="Ouvrir la photo">' +
+      '<img src="' + escapeHtml(p.url) + '" alt="Photo du véhicule" loading="lazy" ' +
+      'style="width:94px;height:70px;object-fit:cover;border-radius:8px;border:1px solid var(--border)"></a>'
+    ).join('');
+    const actions = r.status === 'pending'
+      ? '<button class="btn btn-primary btn-small" data-action="payment" data-id="' + escapeHtml(r.id) + '">Confirmer & envoyer paiement</button>' +
+        '<button class="btn btn-secondary btn-small" data-action="decline" data-id="' + escapeHtml(r.id) + '">Refuser</button>'
+      : '';
+    const paymentLink = r.paymentUrl
+      ? '<a class="btn btn-secondary btn-small" href="' + escapeHtml(r.paymentUrl) + '" target="_blank" rel="noopener noreferrer">Lien paiement</a>'
+      : '';
 
-    ${r.address}<br>💧 Eau : <strong>
-    
-    ${r.water || 'Non renseigné'}</strong> · ⚡ Électricité : <strong>
-    ${r.electricity || 'Non renseigné'}</strong><br>État : 
-    
-    ${r.condition}
-    ${r.note ? ' · ' + r.note : ''}</span>
-
-    ${r.photos?.length ? `<br><span class="photo-count">📷 
-      ${r.photos.length} photo(s) reçue(s)</span>` : ''}</div><div class="admin-actions">
-    
-    ${r.status === 'pending' ? `<button class="btn btn-primary btn-small" onclick="sendPayment('
-      ${r.id}')">Confirmer & envoyer paiement</button><button class="btn btn-secondary btn-small" onclick="decline('
-      ${r.id}')">Refuser</button>` : ''}
-
-    ${r.paymentUrl ? `<a class="btn btn-secondary btn-small" href="
-      ${r.paymentUrl}" target="_blank">Lien paiement</a>` : ''}</div></li>`).join('');
+    return '<li class="booking-admin-item"><div><strong>' + escapeHtml(r.date) + ' · ' + escapeHtml(r.time) +
+      '</strong> <span class="status status-' + escapeHtml(r.status) + '">' + escapeHtml(labelStatus(r.status)) +
+      '</span><br>' + escapeHtml(r.firstName) + ' ' + escapeHtml(r.lastName) + ' · ' + escapeHtml(r.service) +
+      ' · ' + escapeHtml(r.vehicle) + '<br><span class="empty">' + escapeHtml(r.phone) + ' · ' + escapeHtml(r.email) +
+      '<br>' + escapeHtml(r.address) + '<br>💧 Eau : <strong>' + escapeHtml(r.water || 'Non renseigné') +
+      '</strong> · ⚡ Électricité : <strong>' + escapeHtml(r.electricity || 'Non renseigné') +
+      '</strong><br>État : ' + escapeHtml(r.condition || '') + (r.note ? ' · ' + escapeHtml(r.note) : '') +
+      '</span>' + (photos ? '<div class="admin-photo-grid" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px">' + photos + '</div>' :
+      ((r.photos || []).length ? '<br><span class="photo-count">Photos enregistrées, mais leur stockage n’est pas disponible.</span>' : '')) +
+      '</div><div class="admin-actions">' + actions + paymentLink + '</div></li>';
+  }).join('');
 }
+$('#bookings').addEventListener('click', async event => {
+  const button = event.target.closest('button[data-action]');
+  if (!button) return;
+  const id = button.dataset.id;
+  if (button.dataset.action === 'payment') await sendPayment(id);
+  if (button.dataset.action === 'decline') await decline(id);
+});
+
 function labelStatus(s) {
   return {
     pending: 'À vérifier', awaiting_payment: 'Paiement en attente', confirmed: 'Confirmé', declined: 'Refusé'
@@ -125,7 +141,7 @@ $('#blockBtn').onclick = async () => {
     alert(e.message);
   }
 };
-$('#clearBtn').onclick = () => alert('La réinitialisation complète est volontairement désactivée en production. Supprimez les réservations individuellement ou videz les fichiers data côté serveur.');
+$('#clearBtn').onclick = () => render();
 if (!ADMIN_KEY) { 
   ADMIN_KEY = prompt('Clé administrateur (ADMIN_KEY) :') || ''; 
   
