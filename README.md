@@ -1,35 +1,30 @@
-# Epure Auto — Site de detailing automobile
+# Épure Auto — site de detailing automobile
 
-## 1. Présentation
+## Présentation
+Site vitrine et système de demande de réservation pour Épure Auto à Angoulême.
 
-Site web professionnel pour notre activité de nettoyage automobile.
+## Technologies
+- Frontend : HTML, CSS, JavaScript
+- Backend : Node.js et Express (src/server.js)
+- Réservations, créneaux bloqués et état de paiement : PostgreSQL
+- Photos client : bucket Cloudflare R2 privé
+- Paiement : Stripe Checkout
+- Notifications : SMTP via Nodemailer
 
-Objectifs :
-- Présenter les prestations et les tarifs.
-- Permettre aux clients de réserver.
-- Disposer d'un espace d'administration.
-- Présenter des photos avant/après.
+## Démarrage local
+1. Installez Node.js 20 ou plus récent.
+2. Copiez .env.example vers .env et renseignez les valeurs.
+3. Créez une base PostgreSQL et exécutez database/schema.sql.
+4. Depuis la racine du dépôt, lancez npm install.
+5. Lancez npm start et ouvrez http://localhost:3000.
 
-## 2. Version de référence
+## Stockage
+Le serveur n'utilise plus les fichiers JSON locaux pour ses réservations. Les fichiers clients ne sont pas servis comme fichiers statiques. Le bucket R2 doit rester privé ; le tableau de bord admin reçoit des URL signées temporaires pour les photos.
 
-Ce dossier contient la version actuellement développée.
+## Déploiement
+Lisez DEPLOYMENT.md avant toute mise en ligne. Ne publiez pas ce service tant que la base, le stockage des photos, les variables secrètes, Stripe, l'espace admin et les pages légales n'ont pas été testés.
 
-Les anciennes versions sont conservées séparément dans le dossier des archives.
-
-## 3. Technologies
-
-À compléter après vérification du code :
-- HTML
-- CSS
-- JavaScript
-- Node.js
-- Autres dépendances définies dans package.json
-
-## 4. Organisation des fichiers
-
-- `src/` : fichiers de l'application.
-- `src/server.js` : serveur de l'application.
-- `data/` : données de l'application.
-- `uploads/` : fichiers téléversés.
-- `package.json` : dépendances et commandes du projet.
-- `.env` : variables de configuration et secrets.
+## Sécurité
+- Ne commitez jamais .env ni des clés secrètes.
+- Utilisez une longue valeur aléatoire pour ADMIN_KEY.
+- Utilisez Stripe en mode test avant les vrais paiements.
