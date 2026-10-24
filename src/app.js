@@ -102,13 +102,17 @@ function renderSummary() {
   $('#summary').innerHTML = `<strong>${s}</strong> · ${v}<br>${new Date(d + 'T12:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })} à ${t}<br><strong>${amount} €</strong> · durée estimée ${duration}<br>État : ${c}<br>💧 Eau : ${water} · ⚡ Électricité : ${electricity}${photos ? `<br>${photos} photo(s) ajoutée(s)` : ''}`;
 }
 
-function filesToBase64(fileList) {
-  return Promise.all([...fileList].slice(0, 5).map(file => new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve({ name: file.name, type: file.type, data: reader.result });
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  })));
+function validatePhotoFiles(fileList) {
+  const files = [...fileList];
+  if (files.length > 5) throw new Error('Vous pouvez ajouter 5 photos maximum.');
+  for (const file of files) {
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      throw new Error('Utilisez uniquement des photos JPG, PNG ou WEBP.');
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      throw new Error('Chaque photo doit faire 5 Mo maximum.');
+    }
+  }
 }
 
 async function submitBooking(e) {
@@ -119,7 +123,10 @@ async function submitBooking(e) {
   btn.textContent = 'Envoi…';
 
   try {
-    const photos = await filesToBase64($('#photos').files);
+    const photoFiles = $('#photos').files;
+    validatePhotoFiles(photoFiles);
+
+    const formData = new FormData();
     const payload = {
       service: selectedService(),
       vehicle: $('#vehicle').value,
@@ -133,14 +140,14 @@ async function submitBooking(e) {
       water: $('#water').value,
       electricity: $('#electricity').value,
       condition: $('#condition').value,
-      note: $('#note').value.trim(),
-      photos
+      note: $('#note').value.trim()
     };
+    Object.entries(payload).forEach(([key, value]) => formData.append(key, value));
+    [...photoFiles].forEach(file => formData.append('photos', file));
 
     const r = await fetch('/api/bookings', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
+      body: formData
     });
     const data = await r.json();
     if (!r.ok) throw new Error(data.error || 'Erreur lors de l’envoi.');
