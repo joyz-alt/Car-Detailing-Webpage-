@@ -3,7 +3,6 @@ const express = require('express');
 const path = require('path');
 const crypto = require('crypto');
 const multer = require('multer');
-const FileType = require('file-type');
 const { Pool } = require('pg');
 const Stripe = require('stripe');
 const nodemailer = require('nodemailer');
@@ -117,6 +116,20 @@ async function sendMail(to, subject, html) {
     return true;
   } catch (e) { console.error('[EMAIL]', e.message); throw e; }
 }
+function detectImageType(buffer) {
+  if (buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) {
+    return { mime: 'image/jpeg' };
+  }
+  if (buffer.length >= 8 && buffer.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) ) {
+    return { mime: 'image/png' };
+  }
+  if (buffer.length >= 12 && buffer.toString('ascii', 0, 4) === 'RIFF' &&
+      buffer.toString('ascii', 8, 12) === 'WEBP') {
+    return { mime: 'image/webp' };
+  }
+  return null;
+}
+
 async function uploadPhoto(bookingId, file, detected) {
   if (!r2) throw new Error('Le stockage photo R2 n’est pas configuré.');
   const key = 'booking-photos/' + bookingId + '/' + crypto.randomUUID() + '.' + EXTENSIONS[detected.mime];
@@ -331,7 +344,7 @@ app.post('/api/bookings', upload.array('photos', MAX_PHOTOS), asyncHandler(async
 
   const checkedFiles = [];
   for (const file of files) {
-    const detected = await FileType.fromBuffer(file.buffer);
+    const detected = detectImageType(file.buffer);
     if (!detected || !ALLOWED_MIME_TYPES.has(detected.mime)) {
       return res.status(400).json({ error: 'Une photo n’est pas un fichier JPG, PNG ou WEBP valide.' });
     }
