@@ -257,10 +257,10 @@ async function submitBooking(e) {
     const data = await r.json();
     if (!r.ok) throw new Error(data.error || 'Erreur lors de la réservation.');
     if (data.booking && data.booking.paymentUrl) { window.location.assign(data.booking.paymentUrl); return; }
-    $('#bookingForm').innerHTML = '<div class="booking-success" role="status" aria-live="polite"><div class="success-mark">✓</div><small>DEMANDE ENVOYÉE</small><h3>Votre demande est enregistrée.</h3><p>Le paiement en ligne n’est pas disponible pour le moment. Nous devons vérifier votre demande manuellement avant de confirmer le rendez-vous.</p><p>Si vous ne recevez pas notre e-mail, vérifiez vos courriers indésirables (spam).</p><a class="btn btn-primary" href="#prestations">Voir les prestations</a></div>';
+    $('#bookingForm').innerHTML = '<div class="booking-success" role="status" aria-live="polite"><div class="success-mark">✓</div><small>DEMANDE ENVOYÉE</small><h3>Votre demande est enregistrée.</h3><p>Nous vous contacterons pour confirmer les détails de votre rendez-vous. Aucun paiement n’est demandé sur le site : vous réglerez après le nettoyage, une fois le montant final convenu.</p><p>Si vous ne recevez pas notre e-mail, vérifiez vos courriers indésirables (spam).</p><a class="btn btn-primary" href="#prestations">Voir les prestations</a></div>';
   } catch (err) {
     alert(err.message);
-    if (btn) { btn.disabled = false; btn.textContent = 'Confirmer et payer →'; }
+    if (btn) { btn.disabled = false; btn.textContent = 'Envoyer ma demande →'; }
   }
 }
 
