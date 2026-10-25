@@ -4,8 +4,8 @@ let current = 1;
 let slots = [];
 
 const serviceData = {
-  Essentiel: { amount: 75, duration: '1h30 à 2h' },
-  Intégral: { amount: 150, duration: '2h30 à 3h30' }
+  Essentiel: { amount: 90, duration: '1h30 à 2h30' },
+  Intégral: { amount: 130, duration: '2h30 à 3h30' }
 };
 
 function todayISO() {
