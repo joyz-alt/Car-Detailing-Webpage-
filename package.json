@@ -5,8 +5,8 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "node src/server.js",
-    "check": "node --check src/server.js && node --check src/app.js && node --check src/admin.js",
-    "test": "node --test tests/*.test.js"
+    "check": "node --check src/server.js && node --check src/app.js && node --check src/admin.js && node --check tests/integration.test.js",
+    "test": "node --test tests/integration.test.js"
   },
   "engines": {
     "node": ">=20"
