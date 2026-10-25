@@ -15,8 +15,13 @@ async function api(url, opts = {}) {
   const r = await fetch(url, { ...opts, headers: { ...headers(!!opts.body), ...(opts.headers || {}) } });
   const d = await r.json().catch(() => ({}));
 
-  if (!r.ok)
+  if (!r.ok) {
+    if (r.status === 401) {
+      localStorage.removeItem('epure_admin_key');
+      ADMIN_KEY = '';
+    }
     throw new Error(d.error || 'Erreur serveur');
+  }
   return d;
 }
 
@@ -198,7 +203,7 @@ $('#blockBtn').onclick = async () => {
     return alert('Choisissez une date.');
   try {
     await api('/api/admin/blocks', { method: 'POST', body: JSON.stringify({ date, time }) });
-    renderBlocks();
+    renderBlocks(await api('/api/admin/blocks'));
   } catch (e) {
     alert(e.message);
   }
