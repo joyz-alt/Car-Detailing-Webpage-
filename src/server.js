@@ -271,6 +271,7 @@ async function processEmailQueue() {
 
 async function ensureEmailOutboxSchema() {
   await pool.query('ALTER TABLE bookings ADD COLUMN IF NOT EXISTS payment_attempt INTEGER NOT NULL DEFAULT 0');
+  await pool.query("ALTER TABLE bookings ADD COLUMN IF NOT EXISTS payment_items JSONB NOT NULL DEFAULT '[]'::jsonb");
   await pool.query('ALTER TABLE bookings ADD COLUMN IF NOT EXISTS terms_accepted_at TIMESTAMPTZ');
   await pool.query('ALTER TABLE bookings ADD COLUMN IF NOT EXISTS terms_version TEXT');
   await pool.query('ALTER TABLE bookings ADD COLUMN IF NOT EXISTS privacy_version TEXT');
@@ -355,7 +356,7 @@ const BOOKING_SELECT =
   'to_char(b.booking_time, \'HH24:MI\') AS time, b.first_name AS "firstName", b.last_name AS "lastName", ' +
   'b.phone, b.email, b.address, b.water, b.electricity, b.vehicle_condition AS condition, b.note, ' +
   'b.amount_eur AS amount, b.duration_minutes AS "durationMinutes", b.duration_label AS duration, b.status, ' +
-  'b.stripe_session_id AS "stripeSessionId", b.stripe_payment_intent_id AS "stripePaymentIntentId", ' +
+  'b.payment_items AS "paymentItems", b.stripe_session_id AS "stripeSessionId", b.stripe_payment_intent_id AS "stripePaymentIntentId", ' +
   'b.payment_url AS "paymentUrl", b.paid_at AS "paidAt" FROM bookings b ';
 
 async function getBooking(client, id, lock) {
