@@ -432,10 +432,10 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
               dedupeKey: 'booking:' + booking.id + ':confirmed',
               bookingId: booking.id,
               recipient: booking.email,
-              subject: 'Épure Auto — rendez-vous confirmé',
-              htmlBody: '<p>Bonjour ' + escapeHtml(booking.firstName) + ',</p><p>Votre rendez-vous est confirmé pour le <strong>' +
-                escapeHtml(booking.date) + '</strong> à <strong>' + escapeHtml(booking.time) + '</strong>.</p><p>Prestation : ' +
-                escapeHtml(booking.service) + ' · ' + escapeHtml(booking.amount) + ' €</p><p>À bientôt,<br>Épure Auto</p>'
+              subject: 'Épure Auto — paiement reçu, merci !',
+              htmlBody: '<p>Bonjour ' + escapeHtml(booking.firstName) + ',</p><p>Nous confirmons la réception de votre paiement de <strong>' +
+                escapeHtml(booking.amount) + ' €</strong> pour la prestation <strong>' + escapeHtml(booking.service) +
+                '</strong>.</p><p>Merci pour votre confiance !</p><p>À bientôt,<br>Épure Auto</p>'
             });
           }
         }
@@ -453,7 +453,7 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
         );
         await enqueueEmail(client, { dedupeKey: 'booking:' + booking.id + ':payment-expired', bookingId: booking.id,
           recipient: booking.email, subject: 'Épure Auto — lien de paiement expiré',
-          htmlBody: '<p>Bonjour ' + escapeHtml(booking.firstName) + ',</p><p>Le lien de paiement pour le créneau du ' + escapeHtml(booking.date) + ' à ' + escapeHtml(booking.time) + ' a expiré. Votre créneau n’est plus réservé. Vous pouvez effectuer une nouvelle réservation sur notre site.</p><p>À bientôt,<br>Épure Auto</p>' });
+          htmlBody: '<p>Bonjour ' + escapeHtml(booking.firstName) + ',</p><p>Le lien de règlement de votre prestation a expiré. Contactez-nous et nous vous transmettrons un nouveau lien de paiement.</p><p>À bientôt,<br>Épure Auto</p>' });
         confirmation = { expired: true };
       }
     }
@@ -762,15 +762,64 @@ app.post('/api/admin/bookings/:id/payment', adminGuard, asyncHandler(async (req,
   if (!stripe || !process.env.STRIPE_WEBHOOK_SECRET) {
     return res.status(503).json({ error: 'Stripe ou son webhook n’est pas configuré. Aucun lien de paiement n’a été créé.' });
   }
+  const requestedService = text(req.body && req.body.service, 30);
+  const rawAddons = req.body && Array.isArray(req.body.addons) ? req.body.addons : [];
+  if (!SERVICES[requestedService]) {
+    return res.status(400).json({ error: 'Choisissez une formule valide.' });
+  }
+  if (rawAddons.length > 10) {
+    return res.status(400).json({ error: 'Vous pouvez ajouter 10 suppléments maximum.' });
+  }
+  const addons = [];
+  for (const item of rawAddons) {
+    const name = text(item && item.name, 100);
+    const amount = Number(item && item.amount);
+    if (!name || !Number.isSafeInteger(amount) || amount < 1 || amount > 1000) {
+      return res.status(400).json({ error: 'Chaque supplément doit avoir un intitulé et un prix entier compris entre 1 et 1 000 €.' });
+    }
+    addons.push({ name, amount });
+  }
+  const packageDetails = SERVICES[requestedService];
+  const paymentItems = [
+    { name: 'Épure Auto — formule ' + requestedService, amount: packageDetails.amount },
+    ...addons
+  ];
+  const totalAmount = paymentItems.reduce((sum, item) => sum + item.amount, 0);
+  if (!Number.isSafeInteger(totalAmount) || totalAmount > 10000) {
+    return res.status(400).json({ error: 'Le montant total est invalide.' });
+  }
+
   const client = await pool.connect();
   let booking, session;
   try {
     await client.query('BEGIN');
     booking = await getBooking(client, req.params.id, true);
-    if (!booking) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'Réservation introuvable.' }); }
-    if (booking.status !== 'pending') {
+    if (!booking) {
       await client.query('ROLLBACK');
-      return res.status(400).json({ error: 'Cette réservation ne peut pas être envoyée au paiement.' });
+      return res.status(404).json({ error: 'Réservation introuvable.' });
+    }
+    if (!['pending', 'expired'].includes(booking.status)) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: 'Seules les demandes en attente ou les liens expirés peuvent recevoir un nouveau lien de paiement.' });
+    }
+
+    if (packageDetails.durationMinutes > Number(booking.durationMinutes)) {
+      const overlap = await client.query(
+        'SELECT 1 FROM bookings WHERE id <> $1 AND booking_date = $2 AND status = ANY($3::text[]) ' +
+        'AND booking_time < ($4::time + ($5 * interval \'1 minute\')) ' +
+        'AND booking_time + duration_minutes * interval \'1 minute\' > $4::time LIMIT 1',
+        [booking.id, booking.date, ACTIVE_STATUSES, booking.time, packageDetails.durationMinutes]
+      );
+      const blocked = await client.query(
+        'SELECT 1 FROM booking_blocks WHERE block_date = $1 ' +
+        'AND block_time < ($2::time + ($3 * interval \'1 minute\')) ' +
+        'AND block_time + interval \'1 hour\' > $2::time LIMIT 1',
+        [booking.date, booking.time, packageDetails.durationMinutes]
+      );
+      if (overlap.rowCount || blocked.rowCount) {
+        await client.query('ROLLBACK');
+        return res.status(409).json({ error: 'Cette formule est plus longue et chevaucherait un autre rendez-vous ou un créneau bloqué. Choisissez une formule plus courte ou modifiez le planning.' });
+      }
     }
 
     const attemptResult = await client.query(
@@ -782,36 +831,41 @@ app.post('/api/admin/bookings/:id/payment', adminGuard, asyncHandler(async (req,
       mode: 'payment',
       customer_email: booking.email,
       payment_method_types: ['card'],
-      line_items: [{
+      line_items: paymentItems.map(item => ({
         price_data: {
           currency: 'eur',
-          product_data: { name: 'Épure Auto — ' + booking.service, description: booking.vehicle + ' · ' + booking.date + ' à ' + booking.time },
-          unit_amount: Number(booking.amount) * 100
+          product_data: { name: item.name, description: booking.vehicle + ' · ' + booking.date + ' à ' + booking.time },
+          unit_amount: item.amount * 100
         },
         quantity: 1
-      }],
-      metadata: { bookingId: booking.id },
+      })),
+      metadata: { bookingId: booking.id, finalService: requestedService, finalAmount: String(totalAmount) },
       success_url: publicBaseUrl() + '/success.html?booking=' + encodeURIComponent(booking.id),
       cancel_url: publicBaseUrl() + '/reservation-annulee.html?booking=' + encodeURIComponent(booking.id),
-      expires_at: Math.floor(Date.now() / 1000) + 30 * 60
+      expires_at: Math.floor(Date.now() / 1000) + 24 * 60 * 60
     }, {
       idempotencyKey: 'epure-booking-' + booking.id + '-payment-' + paymentAttempt
     });
 
     if (!session.url) throw new Error('Stripe did not return a Checkout URL.');
     await client.query(
-      'UPDATE bookings SET status = \'awaiting_payment\', stripe_session_id = $2, payment_url = $3 WHERE id = $1',
-      [booking.id, session.id, session.url]
+      'UPDATE bookings SET service = $2, amount_eur = $3, duration_minutes = $4, duration_label = $5, ' +
+      'payment_items = $6::jsonb, status = \'awaiting_payment\', stripe_session_id = $7, payment_url = $8 WHERE id = $1',
+      [booking.id, requestedService, totalAmount, packageDetails.durationMinutes, packageDetails.durationLabel,
+        JSON.stringify(paymentItems), session.id, session.url]
     );
+
+    const itemSummary = paymentItems.map(item =>
+      '<li>' + escapeHtml(item.name) + ' : <strong>' + escapeHtml(item.amount) + ' €</strong></li>'
+    ).join('');
     await enqueueEmail(client, {
       dedupeKey: 'booking:' + booking.id + ':payment:' + session.id,
       bookingId: booking.id,
       recipient: booking.email,
-      subject: 'Épure Auto — votre réservation est prête à être confirmée',
-      htmlBody: '<p>Bonjour ' + escapeHtml(booking.firstName) + ',</p><p>Votre créneau du <strong>' + escapeHtml(booking.date) +
-        '</strong> à <strong>' + escapeHtml(booking.time) + '</strong> est disponible.</p><p>Montant : <strong>' +
-        escapeHtml(booking.amount) + ' €</strong></p><p><a href="' + escapeHtml(session.url) +
-        '">Payer et confirmer mon rendez-vous</a></p><p>Le lien expire dans 30 minutes.</p>'
+      subject: 'Épure Auto — règlement de votre prestation',
+      htmlBody: '<p>Bonjour ' + escapeHtml(booking.firstName) + ',</p><p>Merci de nous avoir confié votre véhicule. Voici le détail du montant convenu après la prestation :</p><ul>' +
+        itemSummary + '</ul><p><strong>Total à régler : ' + escapeHtml(totalAmount) + ' €</strong></p><p><a href="' + escapeHtml(session.url) +
+        '">Régler ma prestation</a></p><p>Ce lien de paiement sécurisé est valable pendant 24 heures. Si vous avez une question, contactez-nous.</p><p>À bientôt,<br>Épure Auto</p>'
     });
     await client.query('COMMIT');
   } catch (e) {
@@ -825,7 +879,7 @@ app.post('/api/admin/bookings/:id/payment', adminGuard, asyncHandler(async (req,
     ['booking:' + booking.id + ':payment:' + session.id]
   );
   const emailStatus = emailResult.rows[0] ? emailResult.rows[0].status : 'pending';
-  res.json({ ok: true, paymentUrl: session.url, emailSent: emailStatus === 'sent', emailStatus });
+  res.json({ ok: true, paymentUrl: session.url, totalAmount, emailSent: emailStatus === 'sent', emailStatus });
 }));
 
 app.use((error, req, res, next) => {
