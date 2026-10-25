@@ -197,6 +197,7 @@ function handlePhotoSelection(event) {
   }
 
   if (combined.length > 5) {
+    syncPhotoInput();
     alert('Vous pouvez sélectionner 5 photos maximum au total. Les photos déjà sélectionnées ont été conservées.');
     return;
   }
@@ -204,6 +205,7 @@ function handlePhotoSelection(event) {
   try {
     validatePhotoFiles(combined);
   } catch (err) {
+    syncPhotoInput();
     alert(err.message);
     return;
   }
