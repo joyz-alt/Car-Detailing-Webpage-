@@ -22,8 +22,8 @@ const MAX_PHOTOS = 5;
 const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
 const ACTIVE_STATUSES = ['pending', 'awaiting_payment', 'confirmed'];
 const SERVICES = {
-  Essentiel: { amount: 75, durationMinutes: 105, durationLabel: '1h30 à 2h' },
-  Intégral: { amount: 150, durationMinutes: 180, durationLabel: '2h30 à 3h30' }
+  Essentiel: { amount: 90, durationMinutes: 120, durationLabel: '1h30 à 2h30' },
+  Intégral: { amount: 130, durationMinutes: 180, durationLabel: '2h30 à 3h30' }
 };
 const SLOTS = ['09:00', '10:30', '12:00', '13:00', '14:00', '14:30', '15:30', '17:00'];
 const SERVICE_AREA_CENTER = { lat: 45.64889, lon: 0.17426 }; // Marché Victor Hugo, Angoulême
