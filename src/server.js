@@ -600,6 +600,19 @@ app.get('/api/admin/email-outbox', adminGuard, asyncHandler(async (req, res) => 
   res.json({ configured: emailSetupReady(), provider: getEmailProvider() || 'none', messages: result.rows });
 }));
 
+app.post('/api/admin/email-outbox/:id/retry', adminGuard, asyncHandler(async (req, res) => {
+  const result = await pool.query(
+    "UPDATE email_outbox SET status = 'pending', attempts = 0, next_attempt_at = NOW(), " +
+    "locked_at = NULL, last_error = NULL WHERE id = $1 AND status = 'failed' RETURNING id",
+    [req.params.id]
+  );
+  if (!result.rowCount) {
+    return res.status(409).json({ error: 'Ce message n’est pas en échec ou n’existe plus.' });
+  }
+  void processEmailQueue().catch(e => console.error('[EMAIL MANUAL RETRY]', e.message));
+  res.status(202).json({ ok: true, message: 'Le message a été remis en file d’attente.' });
+}));
+
 app.get('/api/admin/bookings', adminGuard, asyncHandler(async (req, res) => {
   const result = await pool.query(BOOKING_SELECT + 'ORDER BY b.booking_date, b.booking_time, b.created_at DESC');
   res.json(await Promise.all(result.rows.map(async b => ({ ...b, photos: await photoList(b.id) }))));
