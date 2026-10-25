@@ -4,7 +4,6 @@ const path = require('path');
 const crypto = require('crypto');
 const multer = require('multer');
 const { Pool } = require('pg');
-const Stripe = require('stripe');
 const nodemailer = require('nodemailer');
 const { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand } = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
@@ -20,7 +19,7 @@ if (ADMIN_KEY && ADMIN_KEY.length < 32) {
 }
 const MAX_PHOTOS = 5;
 const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
-const ACTIVE_STATUSES = ['pending', 'awaiting_payment', 'confirmed'];
+const ACTIVE_STATUSES = ['pending', 'confirmed'];
 const SERVICES = {
   Essentiel: { amount: 90, durationMinutes: 120, durationLabel: '1h30 à 2h30' },
   Intégral: { amount: 130, durationMinutes: 180, durationLabel: '2h30 à 3h30' }
@@ -73,7 +72,6 @@ const pool = new Pool({
   idleTimeoutMillis: 30000,
   ...(process.env.PGSSL === 'true' ? { ssl: { rejectUnauthorized: false } } : {})
 });
-const stripe = process.env.STRIPE_SECRET_KEY ? Stripe(process.env.STRIPE_SECRET_KEY) : null;
 const r2Configured = Boolean(process.env.R2_ACCOUNT_ID && process.env.R2_ACCESS_KEY_ID &&
   process.env.R2_SECRET_ACCESS_KEY && process.env.R2_BUCKET);
 const r2Endpoint = 'https://' + process.env.R2_ACCOUNT_ID +
@@ -270,15 +268,18 @@ async function processEmailQueue() {
 }
 
 async function ensureEmailOutboxSchema() {
-  await pool.query('ALTER TABLE bookings ADD COLUMN IF NOT EXISTS payment_attempt INTEGER NOT NULL DEFAULT 0');
   await pool.query("ALTER TABLE bookings ADD COLUMN IF NOT EXISTS payment_items JSONB NOT NULL DEFAULT '[]'::jsonb");
+  await pool.query('ALTER TABLE bookings ADD COLUMN IF NOT EXISTS payment_method TEXT');
+  await pool.query('ALTER TABLE bookings ADD COLUMN IF NOT EXISTS payment_agreed_at TIMESTAMPTZ');
   await pool.query('ALTER TABLE bookings ADD COLUMN IF NOT EXISTS terms_accepted_at TIMESTAMPTZ');
   await pool.query('ALTER TABLE bookings ADD COLUMN IF NOT EXISTS terms_version TEXT');
   await pool.query('ALTER TABLE bookings ADD COLUMN IF NOT EXISTS privacy_version TEXT');
   await pool.query('ALTER TABLE bookings ADD COLUMN IF NOT EXISTS early_execution_requested BOOLEAN NOT NULL DEFAULT FALSE');
   await pool.query('ALTER TABLE bookings ADD COLUMN IF NOT EXISTS early_execution_requested_at TIMESTAMPTZ');
+  // Migrate unpaid legacy Stripe states to ordinary pending bookings.
+  await pool.query("UPDATE bookings SET status = 'pending', stripe_session_id = NULL, payment_url = NULL WHERE status IN ('awaiting_payment', 'expired')");
   await pool.query('ALTER TABLE bookings DROP CONSTRAINT IF EXISTS bookings_status_check');
-  await pool.query("ALTER TABLE bookings ADD CONSTRAINT bookings_status_check CHECK (status IN ('pending', 'awaiting_payment', 'confirmed', 'declined', 'expired'))");
+  await pool.query("ALTER TABLE bookings ADD CONSTRAINT bookings_status_check CHECK (status IN ('pending', 'confirmed', 'declined'))");
   await pool.query(
     "CREATE TABLE IF NOT EXISTS email_outbox (" +
     "id BIGSERIAL PRIMARY KEY, " +
@@ -356,8 +357,8 @@ const BOOKING_SELECT =
   'to_char(b.booking_time, \'HH24:MI\') AS time, b.first_name AS "firstName", b.last_name AS "lastName", ' +
   'b.phone, b.email, b.address, b.water, b.electricity, b.vehicle_condition AS condition, b.note, ' +
   'b.amount_eur AS amount, b.duration_minutes AS "durationMinutes", b.duration_label AS duration, b.status, ' +
-  'b.payment_items AS "paymentItems", b.stripe_session_id AS "stripeSessionId", b.stripe_payment_intent_id AS "stripePaymentIntentId", ' +
-  'b.payment_url AS "paymentUrl", b.paid_at AS "paidAt" FROM bookings b ';
+  'b.payment_items AS "paymentItems", b.payment_method AS "paymentMethod", b.payment_agreed_at AS "paymentAgreedAt", ' +
+  'b.paid_at AS "paidAt" FROM bookings b ';
 
 async function getBooking(client, id, lock) {
   const result = await client.query(BOOKING_SELECT + 'WHERE b.id = $1' + (lock ? ' FOR UPDATE' : ''), [id]);
@@ -390,86 +391,6 @@ async function isAvailableInTransaction(client, date, time, service) {
   return blocked.rowCount === 0;
 }
 
-// Stripe signature validation requires the raw request body. Register this before JSON middleware.
-app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), asyncHandler(async (req, res) => {
-  if (!stripe || !process.env.STRIPE_WEBHOOK_SECRET) return res.status(503).send('Stripe webhook non configuré.');
-  let event;
-  try {
-    event = stripe.webhooks.constructEvent(req.body, req.headers['stripe-signature'], process.env.STRIPE_WEBHOOK_SECRET);
-  } catch (e) { return res.status(400).send('Signature webhook invalide.'); }
-
-  const client = await pool.connect();
-  let confirmation = null;
-  try {
-    await client.query('BEGIN');
-    const recorded = await client.query(
-      'INSERT INTO stripe_events (id, event_type) VALUES ($1,$2) ON CONFLICT (id) DO NOTHING RETURNING id',
-      [event.id, event.type]
-    );
-    if (!recorded.rowCount) {
-      await client.query('COMMIT');
-      return res.json({ received: true, duplicate: true });
-    }
-
-    if (event.type === 'checkout.session.completed') {
-      const session = event.data.object;
-      const booking = session.metadata && session.metadata.bookingId
-        ? await getBooking(client, session.metadata.bookingId, true) : null;
-
-      if (booking && session.payment_status === 'paid' && booking.stripeSessionId === session.id) {
-        if (session.currency !== 'eur' || Number(session.amount_total) !== Number(booking.amount) * 100) {
-          throw new Error('Le montant ou la devise Stripe ne correspond pas à la réservation.');
-        }
-        if (booking.status === 'awaiting_payment' || booking.status === 'confirmed') {
-          const updated = await client.query(
-            'UPDATE bookings SET status = \'confirmed\', paid_at = COALESCE(paid_at, NOW()), ' +
-            'stripe_payment_intent_id = COALESCE($2, stripe_payment_intent_id) ' +
-            'WHERE id = $1 AND status <> \'declined\' RETURNING id',
-            [booking.id, typeof session.payment_intent === 'string' ? session.payment_intent : null]
-          );
-          if (updated.rowCount && booking.status !== 'confirmed') {
-            confirmation = booking;
-            await enqueueEmail(client, {
-              dedupeKey: 'booking:' + booking.id + ':confirmed',
-              bookingId: booking.id,
-              recipient: booking.email,
-              subject: 'Épure Auto — paiement reçu, merci !',
-              htmlBody: '<p>Bonjour ' + escapeHtml(booking.firstName) + ',</p><p>Nous confirmons la réception de votre paiement de <strong>' +
-                escapeHtml(booking.amount) + ' €</strong> pour la prestation <strong>' + escapeHtml(booking.service) +
-                '</strong>.</p><p>Merci pour votre confiance !</p><p>À bientôt,<br>Épure Auto</p>'
-            });
-          }
-        }
-      }
-    }
-
-    if (event.type === 'checkout.session.expired') {
-      const session = event.data.object;
-      const booking = session.metadata && session.metadata.bookingId
-        ? await getBooking(client, session.metadata.bookingId, true) : null;
-      if (booking && booking.status === 'awaiting_payment' && booking.stripeSessionId === session.id) {
-        await client.query(
-          'UPDATE bookings SET status = \'expired\', stripe_session_id = NULL, payment_url = NULL WHERE id = $1',
-          [booking.id]
-        );
-        await enqueueEmail(client, { dedupeKey: 'booking:' + booking.id + ':payment-expired', bookingId: booking.id,
-          recipient: booking.email, subject: 'Épure Auto — lien de paiement expiré',
-          htmlBody: '<p>Bonjour ' + escapeHtml(booking.firstName) + ',</p><p>Le lien de règlement de votre prestation a expiré. Contactez-nous et nous vous transmettrons un nouveau lien de paiement.</p><p>À bientôt,<br>Épure Auto</p>' });
-        confirmation = { expired: true };
-      }
-    }
-
-    await client.query('COMMIT');
-  } catch (e) {
-    await client.query('ROLLBACK').catch(() => {});
-    console.error('[STRIPE WEBHOOK]', e.message);
-    return res.status(400).send('Le webhook n’a pas pu être traité.');
-  } finally { client.release(); }
-
-  if (confirmation) void processEmailQueue().catch(e => console.error('[EMAIL CONFIRMATION QUEUE]', e.message));
-  res.json({ received: true });
-}));
-
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true, limit: '100kb' }));
 
@@ -485,7 +406,7 @@ app.get('/health', asyncHandler(async (req, res) => {
   res.json({ ok: true });
 }));
 app.get('/api/config', (req, res) => res.json({
-  stripeEnabled: Boolean(stripe), services: SERVICES, slots: SLOTS,
+  services: SERVICES, slots: SLOTS,
   maxPhotos: MAX_PHOTOS, maxPhotoBytes: MAX_PHOTO_BYTES
 }));
 app.get('/api/email-status', adminGuard, asyncHandler(async (req, res) => {
@@ -735,50 +656,32 @@ app.post('/api/admin/bookings/:id/decline', adminGuard, asyncHandler(async (req,
 }));
 
 app.post('/api/admin/bookings/:id/payment', adminGuard, asyncHandler(async (req, res) => {
-  if (!stripe || !process.env.STRIPE_WEBHOOK_SECRET) {
-    return res.status(503).json({ error: 'Stripe ou son webhook n’est pas configuré. Aucun lien de paiement n’a été créé.' });
-  }
   const requestedService = text(req.body && req.body.service, 30);
+  const paymentMethod = text(req.body && req.body.paymentMethod, 20);
+  const customerAgreed = req.body && req.body.customerAgreed === true;
   const rawAddons = req.body && Array.isArray(req.body.addons) ? req.body.addons : [];
-  if (!SERVICES[requestedService]) {
-    return res.status(400).json({ error: 'Choisissez une formule valide.' });
-  }
-  if (rawAddons.length > 10) {
-    return res.status(400).json({ error: 'Vous pouvez ajouter 10 suppléments maximum.' });
-  }
+  if (!SERVICES[requestedService]) return res.status(400).json({ error: 'Choisissez une formule valide.' });
+  if (!['card', 'cash'].includes(paymentMethod)) return res.status(400).json({ error: 'Choisissez le mode de règlement : carte ou espèces.' });
+  if (!customerAgreed) return res.status(400).json({ error: 'Confirmez que le client a accepté la formule, les suppléments et le montant final.' });
+  if (rawAddons.length > 10) return res.status(400).json({ error: 'Vous pouvez ajouter 10 suppléments maximum.' });
   const addons = [];
   for (const item of rawAddons) {
-    const name = text(item && item.name, 100);
-    const amount = Number(item && item.amount);
-    if (!name || !Number.isSafeInteger(amount) || amount < 1 || amount > 1000) {
-      return res.status(400).json({ error: 'Chaque supplément doit avoir un intitulé et un prix entier compris entre 1 et 1 000 €.' });
-    }
+    const name = text(item && item.name, 100), amount = Number(item && item.amount);
+    if (!name || !Number.isSafeInteger(amount) || amount < 1 || amount > 1000) return res.status(400).json({ error: 'Chaque supplément doit avoir un intitulé et un prix entier compris entre 1 et 1 000 €.' });
     addons.push({ name, amount });
   }
   const packageDetails = SERVICES[requestedService];
-  const paymentItems = [
-    { name: 'Épure Auto — formule ' + requestedService, amount: packageDetails.amount },
-    ...addons
-  ];
+  const paymentItems = [{ name: 'Formule ' + requestedService, amount: packageDetails.amount }, ...addons];
   const totalAmount = paymentItems.reduce((sum, item) => sum + item.amount, 0);
-  if (!Number.isSafeInteger(totalAmount) || totalAmount > 10000) {
-    return res.status(400).json({ error: 'Le montant total est invalide.' });
-  }
+  if (!Number.isSafeInteger(totalAmount) || totalAmount > 10000) return res.status(400).json({ error: 'Le montant total est invalide.' });
 
   const client = await pool.connect();
-  let booking, session;
+  let booking;
   try {
     await client.query('BEGIN');
     booking = await getBooking(client, req.params.id, true);
-    if (!booking) {
-      await client.query('ROLLBACK');
-      return res.status(404).json({ error: 'Réservation introuvable.' });
-    }
-    if (!['pending', 'expired'].includes(booking.status)) {
-      await client.query('ROLLBACK');
-      return res.status(400).json({ error: 'Seules les demandes en attente ou les liens expirés peuvent recevoir un nouveau lien de paiement.' });
-    }
-
+    if (!booking) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'Réservation introuvable.' }); }
+    if (booking.status !== 'pending') { await client.query('ROLLBACK'); return res.status(409).json({ error: 'Seule une réservation en attente peut être marquée comme payée.' }); }
     if (packageDetails.durationMinutes > Number(booking.durationMinutes)) {
       const overlap = await client.query(
         'SELECT 1 FROM bookings WHERE id <> $1 AND booking_date = $2 AND status = ANY($3::text[]) ' +
@@ -797,65 +700,33 @@ app.post('/api/admin/bookings/:id/payment', adminGuard, asyncHandler(async (req,
         return res.status(409).json({ error: 'Cette formule est plus longue et chevaucherait un autre rendez-vous ou un créneau bloqué. Choisissez une formule plus courte ou modifiez le planning.' });
       }
     }
-
-    const attemptResult = await client.query(
-      'UPDATE bookings SET payment_attempt = payment_attempt + 1 WHERE id = $1 RETURNING payment_attempt',
-      [booking.id]
+    const updated = await client.query(
+      "UPDATE bookings SET service = $2, amount_eur = $3, duration_minutes = $4, duration_label = $5, " +
+      "payment_items = $6::jsonb, payment_method = $7, payment_agreed_at = NOW(), status = 'confirmed', paid_at = NOW(), " +
+      "stripe_session_id = NULL, stripe_payment_intent_id = NULL, payment_url = NULL " +
+      "WHERE id = $1 AND status = 'pending' RETURNING id",
+      [booking.id, requestedService, totalAmount, packageDetails.durationMinutes, packageDetails.durationLabel, JSON.stringify(paymentItems), paymentMethod]
     );
-    const paymentAttempt = attemptResult.rows[0].payment_attempt;
-    session = await stripe.checkout.sessions.create({
-      mode: 'payment',
-      customer_email: booking.email,
-      payment_method_types: ['card'],
-      line_items: paymentItems.map(item => ({
-        price_data: {
-          currency: 'eur',
-          product_data: { name: item.name, description: booking.vehicle + ' · ' + booking.date + ' à ' + booking.time },
-          unit_amount: item.amount * 100
-        },
-        quantity: 1
-      })),
-      metadata: { bookingId: booking.id, finalService: requestedService, finalAmount: String(totalAmount) },
-      success_url: publicBaseUrl() + '/success.html?booking=' + encodeURIComponent(booking.id),
-      cancel_url: publicBaseUrl() + '/reservation-annulee.html?booking=' + encodeURIComponent(booking.id),
-      expires_at: Math.floor(Date.now() / 1000) + 24 * 60 * 60
-    }, {
-      idempotencyKey: 'epure-booking-' + booking.id + '-payment-' + paymentAttempt
-    });
-
-    if (!session.url) throw new Error('Stripe did not return a Checkout URL.');
-    await client.query(
-      'UPDATE bookings SET service = $2, amount_eur = $3, duration_minutes = $4, duration_label = $5, ' +
-      'payment_items = $6::jsonb, status = \'awaiting_payment\', stripe_session_id = $7, payment_url = $8 WHERE id = $1',
-      [booking.id, requestedService, totalAmount, packageDetails.durationMinutes, packageDetails.durationLabel,
-        JSON.stringify(paymentItems), session.id, session.url]
-    );
-
-    const itemSummary = paymentItems.map(item =>
-      '<li>' + escapeHtml(item.name) + ' : <strong>' + escapeHtml(item.amount) + ' €</strong></li>'
-    ).join('');
+    if (!updated.rowCount) { await client.query('ROLLBACK'); return res.status(409).json({ error: 'Le statut de la réservation a changé. Actualisez la page.' }); }
+    const itemSummary = paymentItems.map(item => '<li>' + escapeHtml(item.name) + ' : <strong>' + escapeHtml(item.amount) + ' €</strong></li>').join('');
+    const methodLabel = paymentMethod === 'card' ? 'Carte bancaire' : 'Espèces';
     await enqueueEmail(client, {
-      dedupeKey: 'booking:' + booking.id + ':payment:' + session.id,
-      bookingId: booking.id,
-      recipient: booking.email,
-      subject: 'Épure Auto — règlement de votre prestation',
-      htmlBody: '<p>Bonjour ' + escapeHtml(booking.firstName) + ',</p><p>Merci de nous avoir confié votre véhicule. Voici le détail du montant convenu après la prestation :</p><ul>' +
-        itemSummary + '</ul><p><strong>Total à régler : ' + escapeHtml(totalAmount) + ' €</strong></p><p><a href="' + escapeHtml(session.url) +
-        '">Régler ma prestation</a></p><p>Ce lien de paiement sécurisé est valable pendant 24 heures. Si vous avez une question, contactez-nous.</p><p>À bientôt,<br>Épure Auto</p>'
+      dedupeKey: 'booking:' + booking.id + ':receipt', bookingId: booking.id, recipient: booking.email,
+      subject: 'Épure Auto — reçu de votre prestation',
+      htmlBody: '<p>Bonjour ' + escapeHtml(booking.firstName) + ',</p>' +
+        '<p>Merci pour votre confiance. Nous confirmons que votre règlement a été reçu après la prestation.</p>' +
+        '<p><strong>Véhicule :</strong> ' + escapeHtml(booking.vehicle) + '<br><strong>Date :</strong> ' + escapeHtml(booking.date) + ' à ' + escapeHtml(booking.time) +
+        '<br><strong>Mode de règlement :</strong> ' + methodLabel + '</p><ul>' + itemSummary + '</ul>' +
+        '<p><strong>Total réglé : ' + escapeHtml(totalAmount) + ' €</strong></p>' +
+        '<p>Ce courriel récapitule le règlement enregistré par Épure Auto. Conservez-le pour vos dossiers.</p><p>À bientôt,<br>Épure Auto</p>'
     });
     await client.query('COMMIT');
-  } catch (e) {
-    await client.query('ROLLBACK').catch(() => {});
-    throw e;
-  } finally { client.release(); }
-
-  void processEmailQueue().catch(e => console.error('[EMAIL PAYMENT QUEUE]', e.message));
-  const emailResult = await pool.query(
-    'SELECT status FROM email_outbox WHERE dedupe_key = $1',
-    ['booking:' + booking.id + ':payment:' + session.id]
-  );
+  } catch (e) { await client.query('ROLLBACK').catch(() => {}); throw e; }
+  finally { client.release(); }
+  void processEmailQueue().catch(e => console.error('[EMAIL RECEIPT QUEUE]', e.message));
+  const emailResult = await pool.query('SELECT status FROM email_outbox WHERE dedupe_key = $1', ['booking:' + booking.id + ':receipt']);
   const emailStatus = emailResult.rows[0] ? emailResult.rows[0].status : 'pending';
-  res.json({ ok: true, paymentUrl: session.url, totalAmount, emailSent: emailStatus === 'sent', emailStatus });
+  res.json({ ok: true, totalAmount, paymentMethod, emailSent: emailStatus === 'sent', emailStatus });
 }));
 
 app.use((error, req, res, next) => {
