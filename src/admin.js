@@ -64,7 +64,7 @@ function renderBookings(rs) {
         (r.status === 'pending' ? '<button class="btn btn-secondary btn-small" data-action="decline" data-id="' + escapeHtml(r.id) + '">Refuser la demande</button>' : '') +
         '</div>'
       : '';
-    const paymentLink = r.paymentUrl
+    const paymentLink = r.paymentUrl && r.status === 'awaiting_payment'
       ? '<a class="btn btn-secondary btn-small" href="' + escapeHtml(r.paymentUrl) + '" target="_blank" rel="noopener noreferrer">Ouvrir le lien de paiement</a>'
       : '';
 
