@@ -2,7 +2,7 @@
 
 This file is the running checklist for improvements and issues noticed while developing/testing the site. Keep it updated as items are fixed. It is safe to commit; **do not put passwords, API keys, tokens, database URLs, or other secrets here**.
 
-Last reviewed: 25 October 2026
+Last reviewed: 25 October 2026 — Priority 2 front-end changes prepared on feature branch
 
 ## Current status
 
@@ -33,14 +33,14 @@ The booking and legal groundwork has been implemented in the code on `main`, but
 - [ ] Confirm database schema/migrations and environment variables are correctly configured in production.
 
 #### Priority 2 — booking form and front end
-- [ ] Add optional photo upload to the customer booking form (the server supports photos, but the current simplified form does not show an upload field).
-- [ ] Split the intervention address into clear fields where practical: street number and name, postcode, and town/city; ensure server-side validation still works and combines these fields correctly.
-- [ ] Make the CGV acceptance and privacy acknowledgement appear clearly on separate lines, as requested.
-- [ ] Review typography and spacing so text is consistently readable and no headings/body text appear too large or too small.
-- [ ] Remove any unprofessional water/electricity emojis or references if they remain in any part of the site; those questions have already been removed from the main booking form.
-- [ ] Update the “Comment ça marche” steps: the current page still says the customer should provide vehicle details, although this is no longer required in the booking form.
+- [x] Added optional photo upload to the customer booking form (JPG/PNG/WEBP, maximum 5 photos and 5 MB each; requires configured Cloudflare R2 storage to work in production).
+- [x] Split the intervention address into street, postcode and town/city fields; the front end combines them into the existing address payload for server-side validation.
+- [x] Put CGV acceptance and privacy-policy acknowledgement on separate lines with separate required checkboxes.
+- [x] Refined booking-form typography, spacing, field sizing and mobile layout; visual review on real devices is still required.
+- [x] Removed the remaining vehicle-details wording from the “Comment ça marche” steps and removed checkmark glyphs from the booking reassurance list. Confirm no old water/electricity prompts remain elsewhere during the final site review.
+- [x] Updated the “Comment ça marche” steps to explain that optional photos can be provided instead of requiring vehicle details.
 - [ ] Replace the temporary results/photo placeholders with real, permission-cleared before/after photos when available.
-- [ ] Check mobile layout, keyboard navigation, labels, validation messages and contrast.
+- [ ] Run browser-based checks for mobile layout, keyboard navigation, labels, validation messages and contrast after deployment; focus styles and responsive rules have been added in code.
 
 #### Priority 3 — business and customer experience
 - [ ] Check the 75 € / 150 € pricing against actual product costs, travel, time, insurance, charges and desired margin before launch.
