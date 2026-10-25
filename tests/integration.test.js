@@ -75,7 +75,7 @@ let firstBookingId;
 before(async () => {
   pool = new Pool({ connectionString: TEST_DATABASE_URL });
   // Integration tests must run against a dedicated disposable database.
-  await pool.query('TRUNCATE email_outbox, stripe_events, booking_blocks, bookings RESTART IDENTITY CASCADE');
+  await pool.query('TRUNCATE email_outbox, booking_blocks, bookings RESTART IDENTITY CASCADE');
 
   const port = await getFreePort();
   baseUrl = 'http://127.0.0.1:' + port;
@@ -104,8 +104,6 @@ before(async () => {
       R2_ACCESS_KEY_ID: '',
       R2_SECRET_ACCESS_KEY: '',
       R2_BUCKET: '',
-      STRIPE_SECRET_KEY: '',
-      STRIPE_WEBHOOK_SECRET: ''
     },
     stdio: ['ignore', 'pipe', 'pipe']
   });
@@ -199,20 +197,33 @@ test('admin endpoints reject unauthenticated requests and show saved booking/out
   assert.equal(outbox.messages.length, 2);
 });
 
-test('payment cannot be initiated when Stripe and its webhook are not configured', async () => {
-  const response = await fetch(baseUrl + '/api/admin/bookings/' + encodeURIComponent(firstBookingId) + '/payment', {
-    method: 'POST',
-    headers: { 'x-admin-key': adminKey }
-  });
-  assert.equal(response.status, 503);
-  assert.match((await response.json()).error, /Stripe|webhook/i);
-});
-
-test('Stripe webhook is unavailable when Stripe is not configured', async () => {
-  const response = await fetch(baseUrl + '/api/stripe/webhook', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ id: 'evt_test_disabled', type: 'checkout.session.completed', data: { object: {} } })
-  });
-  assert.equal(response.status, 503);
+test('manual payment requires customer agreement and records itemized receipt details', async () => {
+  const endpoint = baseUrl + '/api/admin/bookings/' + encodeURIComponent(firstBookingId) + '/payment';
+  const headers = { 'x-admin-key': adminKey, 'content-type': 'application/json' };
+  const missingAgreement = await fetch(endpoint, { method: 'POST', headers,
+    body: JSON.stringify({ service: 'Essentiel', paymentMethod: 'cash', addons: [] }) });
+  assert.equal(missingAgreement.status, 400);
+  assert.match((await missingAgreement.json()).error, /accepté|accept/i);
+  const response = await fetch(endpoint, { method: 'POST', headers, body: JSON.stringify({
+    service: 'Essentiel', paymentMethod: 'cash', customerAgreed: true,
+    addons: [{ name: 'Poils d’animaux', amount: 20 }, { name: 'Traitement des taches', amount: 15 }]
+  }) });
+  const payload = await response.json();
+  assert.equal(response.status, 200, JSON.stringify(payload));
+  assert.equal(payload.totalAmount, 125);
+  assert.equal(payload.paymentMethod, 'cash');
+  const stored = await pool.query('SELECT status, amount_eur, payment_method, payment_items, payment_agreed_at, paid_at FROM bookings WHERE id = $1', [firstBookingId]);
+  assert.equal(stored.rows[0].status, 'confirmed');
+  assert.equal(Number(stored.rows[0].amount_eur), 125);
+  assert.equal(stored.rows[0].payment_method, 'cash');
+  assert.equal(stored.rows[0].payment_items.length, 3);
+  assert.ok(stored.rows[0].payment_agreed_at);
+  assert.ok(stored.rows[0].paid_at);
+  const receipt = await pool.query('SELECT recipient, subject, html_body FROM email_outbox WHERE booking_id = $1 AND dedupe_key = $2',
+    [firstBookingId, 'booking:' + firstBookingId + ':receipt']);
+  assert.equal(receipt.rowCount, 1);
+  assert.equal(receipt.rows[0].recipient, 'client@example.test');
+  assert.match(receipt.rows[0].subject, /reçu/i);
+  assert.match(receipt.rows[0].html_body, /Poils d’animaux/);
+  assert.match(receipt.rows[0].html_body, /125 €/);
 });
