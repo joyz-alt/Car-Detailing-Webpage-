@@ -4,8 +4,8 @@ let current = 1;
 let slots = [];
 
 const serviceData = {
-  Essentiel: { amount: 59, duration: '1h30 à 2h' },
-  Intégral: { amount: 99, duration: '2h30 à 3h30' }
+  Essentiel: { amount: 75, duration: '1h30 à 2h' },
+  Intégral: { amount: 150, duration: '2h30 à 3h30' }
 };
 
 function todayISO() {
@@ -28,12 +28,11 @@ function goStep(n) {
 function validateStep(step) {
   if (step === 1) {
     if (!$('#service').value) return alert('Choisissez une prestation.'), false;
-    if (!$('#vehicle').value) return alert('Choisissez votre véhicule.'), false;
     return true;
   }
   if (step === 2 && !$('#time').value) return alert('Choisissez un créneau.'), false;
   if (step === 3) {
-    const ids = ['firstName', 'lastName', 'phone', 'email', 'address', 'water', 'electricity', 'condition'];
+    const ids = ['firstName', 'lastName', 'phone', 'email', 'address'];
     for (const id of ids) {
       const field = $('#' + id);
       if (!field.value.trim()) {
@@ -89,17 +88,12 @@ async function loadSlots() {
 
 function renderSummary() {
   const s = selectedService();
-  const v = $('#vehicle').value;
   const d = $('#date').value;
   const t = $('#time').value;
-  const c = $('#condition').value;
-  const water = $('#water').value;
-  const electricity = $('#electricity').value;
-  const photos = $('#photos').files.length;
   const amount = serviceData[s]?.amount ?? 0;
   const duration = serviceData[s]?.duration ?? '';
 
-  $('#summary').innerHTML = `<strong>${s}</strong> · ${v}<br>${new Date(d + 'T12:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })} à ${t}<br><strong>${amount} €</strong> · durée estimée ${duration}<br>État : ${c}<br>💧 Eau : ${water} · ⚡ Électricité : ${electricity}${photos ? `<br>${photos} photo(s) ajoutée(s)` : ''}`;
+  $('#summary').textContent = `${s} · ${new Date(d + 'T12:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })} à ${t} · ${amount} € · durée estimée ${duration}`;
 }
 
 function validatePhotoFiles(fileList) {
@@ -123,13 +117,9 @@ async function submitBooking(e) {
   btn.textContent = 'Envoi…';
 
   try {
-    const photoFiles = $('#photos').files;
-    validatePhotoFiles(photoFiles);
-
     const formData = new FormData();
     const payload = {
       service: selectedService(),
-      vehicle: $('#vehicle').value,
       date: $('#date').value,
       time: $('#time').value,
       firstName: $('#firstName').value.trim(),
@@ -137,22 +127,16 @@ async function submitBooking(e) {
       phone: $('#phone').value.trim(),
       email: $('#email').value.trim(),
       address: $('#address').value.trim(),
-      water: $('#water').value,
-      electricity: $('#electricity').value,
-      condition: $('#condition').value,
+      legalAccepted: $('#legalAccepted').checked ? 'true' : 'false',
       note: $('#note').value.trim()
     };
     Object.entries(payload).forEach(([key, value]) => formData.append(key, value));
-    [...photoFiles].forEach(file => formData.append('photos', file));
 
-    const r = await fetch('/api/bookings', {
-      method: 'POST',
-      body: formData
-    });
+    const r = await fetch('/api/bookings', { method: 'POST', body: formData });
     const data = await r.json();
-    if (!r.ok) throw new Error(data.error || 'Erreur lors de l’envoi.');
-
-    $('#bookingForm').innerHTML = `<div class="booking-success"><div class="success-mark">✓</div><small>DEMANDE ENVOYÉE</small><h3>Votre demande est bien reçue.</h3><p>Nous vérifions le créneau et les informations transmises. Si tout est bon, vous recevrez ensuite un e-mail avec le lien de paiement pour confirmer définitivement votre rendez-vous.</p><p class="success-note">Aucun paiement n'est demandé à cette étape.</p><a class="btn btn-primary" href="#prestations">Voir les prestations</a></div>`;
+    if (!r.ok) throw new Error(data.error || 'Erreur lors de la réservation.');
+    if (data.booking && data.booking.paymentUrl) { window.location.assign(data.booking.paymentUrl); return; }
+    $('#bookingForm').innerHTML = '<div class="booking-success" role="status" aria-live="polite"><div class="success-mark">✓</div><small>DEMANDE ENVOYÉE</small><h3>Votre demande est enregistrée.</h3><p>Le paiement en ligne n’est pas disponible pour le moment. Nous devons vérifier votre demande manuellement avant de confirmer le rendez-vous.</p><p>Si vous ne recevez pas notre e-mail, vérifiez vos courriers indésirables (spam).</p><a class="btn btn-primary" href="#prestations">Voir les prestations</a></div>';
   } catch (err) {
     alert(err.message);
     btn.disabled = false;
@@ -188,13 +172,6 @@ function init() {
   $$('.next-btn').forEach(b => b.addEventListener('click', () => goStep(current + 1)));
   $$('.back-btn').forEach(b => b.addEventListener('click', () => goStep(current - 1)));
   $('#bookingForm')?.addEventListener('submit', submitBooking);
-  $('#condition')?.addEventListener('change', renderSummary);
-  $('#water')?.addEventListener('change', updateResourceNote);
-  $('#electricity')?.addEventListener('change', updateResourceNote);
-  $('#photos')?.addEventListener('change', () => {
-    const n = $('#photos').files.length;
-    $('#photoHint').textContent = n ? `${n} photo(s) sélectionnée(s) · facultatif` : 'Ajoutez quelques photos si vous souhaitez nous aider à évaluer l’état du véhicule.';
-  });
 }
 
 init();

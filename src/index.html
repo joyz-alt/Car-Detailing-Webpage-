@@ -77,7 +77,7 @@
           <div class="service-top"><span>01</span><span>~ 1H30–2H</span></div>
           <h3>Essentiel</h3>
           <p>Le nettoyage intérieur complet pour l'entretien courant et une vraie remise au propre.</p>
-          <div class="price"><strong>59€</strong></div>
+          <div class="price"><strong>75 €</strong></div>
           <ul>
             <li>Aspiration complète de l'habitacle & du coffre</li>
             <li>Dépoussiérage et nettoyage des plastiques</li>
@@ -95,7 +95,7 @@
           <div class="service-top"><span>02</span><span>~ 2H30–3H30</span></div>
           <h3>Intégral</h3>
           <p>Le nettoyage en profondeur pour remettre l'habitacle en état et traiter les textiles plus sérieusement.</p>
-          <div class="price"><strong>99€</strong></div>
+          <div class="price"><strong>150 €</strong></div>
           <ul>
             <li>Tout le contenu de l'Essentiel</li>
             <li>Nettoyage approfondi des sièges textiles</li>
@@ -209,8 +209,7 @@
         <div class="booking-info">
           <div class="section-label">07 — RÉSERVATION</div>
           <h2>Votre demande.<br><span>En quelques clics.</span></h2>
-          <p>Choisissez votre formule, votre créneau et transmettez-nous les informations utiles. Nous vérifions la
-            demande avant de confirmer le rendez-vous et d'envoyer le paiement sécurisé.</p>
+          <p>Deux formules, une adresse et un créneau disponible. Réservez en quelques étapes, sans choix inutiles.</p>
           <div class="booking-points"><span>✓ Créneau vérifié avant confirmation</span><span>✓ Photos facultatives mais
               recommandées</span><span>✓ Paiement sécurisé après validation</span></div>
         </div>
@@ -220,20 +219,14 @@
 
           <div class="form-step active" data-step="1">
             <div class="step-title"><small>ÉTAPE 1/3</small>
-              <h3>Votre véhicule</h3>
+              <h3>Choisissez votre formule</h3>
             </div>
             <label>Prestation<select id="service" required>
                 <option value="">Choisir une prestation</option>
-                <option>Essentiel — 59€</option>
-                <option>Intégral — 99€</option>
+                <option>Essentiel — 75€</option>
+                <option>Intégral — 150€</option>
               </select></label>
-            <label>Type de véhicule<select id="vehicle" required>
-                <option value="">Choisir</option>
-                <option>Citadine / compacte</option>
-                <option>Berline / break</option>
-                <option>SUV / 4x4</option>
-                <option>Monospace / utilitaire / 7 places</option>
-              </select></label>
+            <p class="form-help">Pas besoin de choisir votre véhicule pour réserver. Vous pourrez nous transmettre des précisions plus tard si nécessaire.</p>
             <button type="button" class="btn btn-primary next-btn">Continuer →</button>
           </div>
 
@@ -260,40 +253,11 @@
             <label>E-mail<input id="email" type="email" required autocomplete="email"></label>
             <label>Adresse du véhicule<input id="address" required autocomplete="street-address"
                 placeholder="Adresse où se trouve le véhicule"></label>
-            <div class="two-col availability-questions">
-              <label>💧 Eau disponible sur place ?<select id="water" required>
-                  <option value="">Choisir</option>
-                  <option value="Oui">Oui</option>
-                  <option value="Non">Non</option>
-                </select></label>
-              <label>⚡ Électricité disponible sur place ?<select id="electricity" required>
-                  <option value="">Choisir</option>
-                  <option value="Oui">Oui</option>
-                  <option value="Non">Non</option>
-                </select></label>
-            </div>
-            <div class="resource-note" id="resourceNote" hidden><strong>À noter :</strong> l'accès à l'eau et à
-              l'électricité est actuellement nécessaire pour nos prestations. Votre demande peut tout de même être
-              envoyée ; nous vérifierons la situation avant de confirmer le rendez-vous.</div>
-            <label>État du véhicule<select id="condition" required>
-                <option value="">Choisir</option>
-                <option>Entretien régulier</option>
-                <option>Sale</option>
-                <option>Très sale</option>
-                <option>Beaucoup de poils d’animaux</option>
-                <option>Odeurs fortes / tabac</option>
-                <option>Taches importantes</option>
-              </select></label>
-            <label>Photos du véhicule <small>(facultatif · jusqu'à 5)</small><input id="photos" type="file"
-                accept="image/jpeg,image/png,image/webp" multiple><small id="photoHint">Ajoutez quelques photos si vous
-                souhaitez nous aider à évaluer l'état du véhicule.</small></label>
-            <label>Note <small>(facultatif)</small><textarea id="note" rows="3"
-                placeholder="Poils d'animaux, taches, besoin particulier…"></textarea></label>
             <div class="summary" id="summary"></div>
+            <label class="terms-check"><input id="legalAccepted" type="checkbox" required> J’ai lu et j’accepte les <a href="cgv.html" target="_blank" rel="noopener noreferrer">conditions générales de vente</a> et pris connaissance de la <a href="politique-confidentialite.html" target="_blank" rel="noopener noreferrer">politique de confidentialité</a>.</label>
             <div class="form-actions"><button type="button" class="btn btn-secondary back-btn">← Retour</button><button
                 type="submit" class="btn btn-primary">Envoyer ma demande →</button></div>
-            <p class="payment-note">🔒 Aucun paiement maintenant. Après vérification, vous recevrez un lien de paiement
-              sécurisé pour confirmer votre rendez-vous.</p>
+            <p class="payment-note">Le paiement sécurisé permet de confirmer le rendez-vous. Si vous ne recevez pas d’e-mail, vérifiez vos courriers indésirables (spam).</p>
           </div>
         </form>
       </div>
@@ -346,10 +310,9 @@
       <p>Nettoyage intérieur automobile à domicile à Angoulême et alentours.</p>
     </div>
     <div class="footer-links"><a href="#prestations">Prestations</a><a href="#reservation">Réserver</a><a
-        href="#faq">FAQ</a><a href="admin.html">Espace pro</a><a href="#">Mentions légales</a><a
-        href="#">Confidentialité</a></div>
+        href="#faq">FAQ</a><a href="admin.html">Espace pro</a><a href="mentions-legales.html">Mentions légales</a><a href="politique-confidentialite.html">Confidentialité</a><a href="cgv.html">CGV</a></div>
     <div><small>© 2026 Épure Auto. Tous droits réservés.</small>
-      <p class="footer-placeholder">Les pages juridiques seront activées avant la mise en ligne publique.</p>
+      <p class="footer-placeholder">Les pages juridiques doivent être complétées avant le lancement commercial.</p>
     </div>
   </footer>
   <div class="mobile-book"><a href="#reservation">Réserver ma prestation <span>→</span></a></div>

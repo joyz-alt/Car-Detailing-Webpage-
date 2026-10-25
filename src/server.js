@@ -22,8 +22,8 @@ const MAX_PHOTOS = 5;
 const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
 const ACTIVE_STATUSES = ['pending', 'awaiting_payment', 'confirmed'];
 const SERVICES = {
-  Essentiel: { amount: 59, durationMinutes: 105, durationLabel: '1h30 à 2h' },
-  Intégral: { amount: 99, durationMinutes: 180, durationLabel: '2h30 à 3h30' }
+  Essentiel: { amount: 75, durationMinutes: 105, durationLabel: '1h30 à 2h' },
+  Intégral: { amount: 150, durationMinutes: 180, durationLabel: '2h30 à 3h30' }
 };
 const SLOTS = ['09:00', '10:30', '12:00', '13:00', '14:00', '14:30', '15:30', '17:00'];
 const SERVICE_AREA_CENTER = { lat: 45.64889, lon: 0.17426 }; // Marché Victor Hugo, Angoulême
@@ -44,7 +44,7 @@ async function validateServiceAddress(address) {
   url.searchParams.set('countrycodes', 'fr');
   url.searchParams.set('q', address + ', France');
   const response = await fetch(url, {
-    headers: { 'User-Agent': 'EpureAutoBooking/1.0 (service-area validation)' },
+    headers: { 'User-Agent': 'EpureAutoBooking/1.0 (https://epure-auto.com)' },
     signal: AbortSignal.timeout(5000)
   });
   if (!response.ok) throw new Error('Le service de vérification d’adresse est temporairement indisponible. Réessayez dans un instant.');
@@ -270,9 +270,12 @@ async function processEmailQueue() {
 }
 
 async function ensureEmailOutboxSchema() {
-  await pool.query(
-    'ALTER TABLE bookings ADD COLUMN IF NOT EXISTS payment_attempt INTEGER NOT NULL DEFAULT 0'
-  );
+  await pool.query('ALTER TABLE bookings ADD COLUMN IF NOT EXISTS payment_attempt INTEGER NOT NULL DEFAULT 0');
+  await pool.query('ALTER TABLE bookings ADD COLUMN IF NOT EXISTS terms_accepted_at TIMESTAMPTZ');
+  await pool.query('ALTER TABLE bookings ADD COLUMN IF NOT EXISTS terms_version TEXT');
+  await pool.query('ALTER TABLE bookings ADD COLUMN IF NOT EXISTS privacy_version TEXT');
+  await pool.query('ALTER TABLE bookings DROP CONSTRAINT IF EXISTS bookings_status_check');
+  await pool.query("ALTER TABLE bookings ADD CONSTRAINT bookings_status_check CHECK (status IN ('pending', 'awaiting_payment', 'confirmed', 'declined', 'expired'))");
   await pool.query(
     "CREATE TABLE IF NOT EXISTS email_outbox (" +
     "id BIGSERIAL PRIMARY KEY, " +
@@ -443,9 +446,13 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
         ? await getBooking(client, session.metadata.bookingId, true) : null;
       if (booking && booking.status === 'awaiting_payment' && booking.stripeSessionId === session.id) {
         await client.query(
-          'UPDATE bookings SET status = \'pending\', stripe_session_id = NULL, payment_url = NULL WHERE id = $1',
+          'UPDATE bookings SET status = \'expired\', stripe_session_id = NULL, payment_url = NULL WHERE id = $1',
           [booking.id]
         );
+        await enqueueEmail(client, { dedupeKey: 'booking:' + booking.id + ':payment-expired', bookingId: booking.id,
+          recipient: booking.email, subject: 'Épure Auto — lien de paiement expiré',
+          htmlBody: '<p>Bonjour ' + escapeHtml(booking.firstName) + ',</p><p>Le lien de paiement pour le créneau du ' + escapeHtml(booking.date) + ' à ' + escapeHtml(booking.time) + ' a expiré. Votre créneau n’est plus réservé. Vous pouvez effectuer une nouvelle réservation sur notre site.</p><p>À bientôt,<br>Épure Auto</p>' });
+        confirmation = { expired: true };
       }
     }
 
@@ -530,7 +537,7 @@ app.post('/api/bookings', bookingRateLimit, (req, res, next) => {
 }, upload.array('photos', MAX_PHOTOS), asyncHandler(async (req, res) => {
   const body = req.body || {};
   const service = text(body.service, 30);
-  const vehicle = text(body.vehicle, 100);
+  const vehicle = text(body.vehicle, 100) || 'Non renseigné';
   const date = text(body.date, 10);
   const time = text(body.time, 5);
   const firstName = text(body.firstName, 100);
@@ -538,23 +545,24 @@ app.post('/api/bookings', bookingRateLimit, (req, res, next) => {
   const phone = text(body.phone, 40);
   const email = text(body.email, 254).toLowerCase();
   const address = text(body.address, 300);
-  const water = text(body.water, 10);
-  const electricity = text(body.electricity, 10);
-  const condition = text(body.condition, 100);
+  const water = text(body.water, 10) || 'Non renseigné';
+  const electricity = text(body.electricity, 10) || 'Non renseigné';
+  const condition = text(body.condition, 100) || 'Non renseigné';
   const note = text(body.note, 1500);
+  const legalAccepted = text(body.legalAccepted, 10);
   const files = req.files || [];
 
-  if (!SERVICES[service] || !vehicle || !date || !time || !firstName || !lastName || !phone ||
-      !email || !address || !water || !electricity || !condition) {
+  if (!SERVICES[service] || !date || !time || !firstName || !lastName || !phone || !email || !address || legalAccepted !== 'true') {
     return res.status(400).json({ error: 'Merci de compléter tous les champs obligatoires.' });
   }
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'Adresse e-mail invalide.' });
-  if (!['Oui', 'Non'].includes(water) || !['Oui', 'Non'].includes(electricity)) {
-    return res.status(400).json({ error: 'Veuillez préciser si l’eau et l’électricité sont disponibles.' });
-  }
   if (!isValidDate(date) || date < parisToday()) return res.status(400).json({ error: 'La date de réservation est invalide.' });
   if (!SLOTS.includes(time)) return res.status(400).json({ error: 'Créneau invalide.' });
   if (date === parisToday() && slotMinutes(time) <= parisMinutesNow()) return res.status(400).json({ error: 'Ce créneau est déjà passé.' });
+  let serviceAddress;
+  try { serviceAddress = await validateServiceAddress(address); }
+  catch (e) { return res.status(503).json({ error: e.message || 'Vérification d’adresse indisponible. Réessayez.' }); }
+  if (!serviceAddress.valid) return res.status(400).json({ error: serviceAddress.reason });
   if (files.length && !r2) return res.status(503).json({ error: 'Le stockage des photos n’est pas configuré. Configurez R2 avant d’envoyer des photos.' });
 
   const checkedFiles = [];
@@ -569,6 +577,7 @@ app.post('/api/bookings', bookingRateLimit, (req, res, next) => {
   const id = makeId();
   const photos = [];
   const client = await pool.connect();
+  let paymentSession = null;
   try {
     for (const item of checkedFiles) photos.push(await uploadPhoto(id, item.file, item.detected));
 
@@ -582,15 +591,36 @@ app.post('/api/bookings', bookingRateLimit, (req, res, next) => {
 
     const details = SERVICES[service];
     await client.query(
-      'INSERT INTO bookings (id, service, vehicle, booking_date, booking_time, first_name, last_name, phone, email, address, water, electricity, vehicle_condition, note, amount_eur, duration_minutes, duration_label, status) ' +
-      'VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,\'pending\')',
+      'INSERT INTO bookings (id, service, vehicle, booking_date, booking_time, first_name, last_name, phone, email, address, water, electricity, vehicle_condition, note, amount_eur, duration_minutes, duration_label, status, terms_accepted_at, terms_version, privacy_version) ' +
+      'VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,\'pending\',NOW(),\'2026-10-25\',\'2026-10-25\')',
       [id, service, vehicle, date, time, firstName, lastName, phone, email, address, water, electricity, condition, note,
        details.amount, details.durationMinutes, details.durationLabel]
-    );
-    for (const p of photos) {
+    );    for (const p of photos) {
       await client.query(
         'INSERT INTO booking_photos (booking_id, object_key, original_name, content_type, size_bytes) VALUES ($1,$2,$3,$4,$5)',
         [id, p.objectKey, p.originalName, p.contentType, p.sizeBytes]
+      );
+    }
+
+    if (stripe && process.env.STRIPE_WEBHOOK_SECRET) {
+      paymentSession = await stripe.checkout.sessions.create({
+        mode: 'payment',
+        customer_email: email,
+        payment_method_types: ['card'],
+        line_items: [{ price_data: {
+          currency: 'eur',
+          product_data: { name: 'Épure Auto — ' + service, description: date + ' à ' + time },
+          unit_amount: SERVICES[service].amount * 100
+        }, quantity: 1 }],
+        metadata: { bookingId: id },
+        success_url: publicBaseUrl() + '/success.html?booking=' + encodeURIComponent(id),
+        cancel_url: publicBaseUrl() + '/reservation-annulee.html?booking=' + encodeURIComponent(id),
+        expires_at: Math.floor(Date.now() / 1000) + 35 * 60
+      }, { idempotencyKey: 'epure-booking-' + id + '-payment-1' });
+      if (!paymentSession.url) throw new Error('Stripe did not return a Checkout URL.');
+      await client.query(
+        "UPDATE bookings SET status = 'awaiting_payment', stripe_session_id = $2, payment_url = $3 WHERE id = $1",
+        [id, paymentSession.id, paymentSession.url]
       );
     }
 
@@ -602,7 +632,7 @@ app.post('/api/bookings', bookingRateLimit, (req, res, next) => {
       htmlBody: '<h2>Nouvelle demande de réservation</h2><p><strong>' + escapeHtml(firstName) + ' ' + escapeHtml(lastName) +
         '</strong><br>' + escapeHtml(phone) + '<br>' + escapeHtml(email) + '</p><p><strong>' + escapeHtml(service) +
         '</strong> · ' + escapeHtml(vehicle) + '<br>' + escapeHtml(date) + ' à ' + escapeHtml(time) + '<br>' +
-        escapeHtml(address) + '</p><p>💧 Eau : <strong>' + escapeHtml(water) + '</strong><br>⚡ Électricité : <strong>' +
+        escapeHtml(address) + '</p><p>Eau : <strong>' + escapeHtml(water) + '</strong><br>Électricité : <strong>' +
         escapeHtml(electricity) + '</strong><br>État : <strong>' + escapeHtml(condition) + '</strong></p><p>Photos : ' +
         photos.length + '</p>' + (note ? '<p>Note : ' + escapeHtml(note) + '</p>' : '') +
         '<p><a href="' + escapeHtml(publicBaseUrl()) + '/admin.html">Ouvrir l’espace pro</a></p>'
@@ -612,9 +642,9 @@ app.post('/api/bookings', bookingRateLimit, (req, res, next) => {
       bookingId: id,
       recipient: email,
       subject: 'Épure Auto — demande de réservation reçue',
-      htmlBody: '<p>Bonjour ' + escapeHtml(firstName) + ',</p><p>Nous avons bien reçu votre demande pour la prestation <strong>' +
-        escapeHtml(service) + '</strong> le <strong>' + escapeHtml(date) + '</strong> à <strong>' + escapeHtml(time) +
-        '</strong>.</p><p>Votre demande n’est pas encore confirmée. Nous vérifions les informations et le créneau, puis nous vous enverrons un lien de paiement si la réservation est acceptée.</p><p>À bientôt,<br>Épure Auto</p>'
+      htmlBody: paymentSession
+        ? '<p>Bonjour ' + escapeHtml(firstName) + ',</p><p>Votre réservation a été enregistrée pour <strong>' + escapeHtml(service) + '</strong>, le <strong>' + escapeHtml(date) + '</strong> à <strong>' + escapeHtml(time) + '</strong>.</p><p>Pour confirmer le rendez-vous, effectuez le paiement sécurisé : <a href="' + escapeHtml(paymentSession.url) + '">payer et confirmer mon rendez-vous</a>. Ce lien expire dans 35 minutes.</p><p>Si vous ne voyez pas cet e-mail dans votre boîte de réception, vérifiez vos courriers indésirables (spam).</p><p>À bientôt,<br>Épure Auto</p>'
+        : '<p>Bonjour ' + escapeHtml(firstName) + ',</p><p>Nous avons bien reçu votre demande pour la prestation <strong>' + escapeHtml(service) + '</strong> le <strong>' + escapeHtml(date) + '</strong> à <strong>' + escapeHtml(time) + '</strong>.</p><p>La demande attend une validation manuelle car le paiement en ligne n’est pas disponible. Nous vous recontacterons après vérification.</p><p>Si vous ne voyez pas cet e-mail dans votre boîte de réception, vérifiez vos courriers indésirables (spam).</p><p>À bientôt,<br>Épure Auto</p>'
     });
     await client.query('COMMIT');
   } catch (e) {
@@ -628,9 +658,9 @@ app.post('/api/bookings', bookingRateLimit, (req, res, next) => {
 
 
   res.status(201).json({
-    booking: { id, service, vehicle, date, time, firstName, lastName, amount: SERVICES[service].amount, status: 'pending',
+    booking: { id, service, vehicle, date, time, firstName, lastName, amount: SERVICES[service].amount, status: paymentSession ? 'awaiting_payment' : 'pending', paymentUrl: paymentSession ? paymentSession.url : null,
       photos: photos.map(p => ({ name: p.originalName, type: p.contentType })) },
-    message: 'Demande envoyée. Votre créneau sera confirmé après vérification.'
+    message: paymentSession ? 'Réservation enregistrée. Le paiement sécurisé permettra de confirmer votre rendez-vous.' : 'Demande envoyée. La réservation attend une validation manuelle car le paiement en ligne n’est pas disponible.'
   });
 }));
 
