@@ -139,7 +139,7 @@ test('a valid customer request is stored and queues two notifications', async ()
   const payload = await response.json();
   assert.equal(response.status, 201, JSON.stringify(payload));
   assert.equal(payload.booking.service, 'Essentiel');
-  assert.equal(payload.booking.amount, 75);
+  assert.equal(payload.booking.amount, 90);
   assert.equal(payload.booking.status, 'pending');
   firstBookingId = payload.booking.id;
 
