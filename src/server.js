@@ -26,6 +26,38 @@ const SERVICES = {
   Intégral: { amount: 99, durationMinutes: 180, durationLabel: '2h30 à 3h30' }
 };
 const SLOTS = ['09:00', '10:30', '12:00', '13:00', '14:00', '14:30', '15:30', '17:00'];
+const SERVICE_AREA_CENTER = { lat: 45.64889, lon: 0.17426 }; // Marché Victor Hugo, Angoulême
+const SERVICE_AREA_RADIUS_KM = 25;
+function haversineKm(a, b) {
+  const radians = degrees => degrees * Math.PI / 180;
+  const dLat = radians(b.lat - a.lat), dLon = radians(b.lon - a.lon);
+  const lat1 = radians(a.lat), lat2 = radians(b.lat);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
+  return 6371 * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(Math.max(0, 1 - h)));
+}
+async function validateServiceAddress(address) {
+  if (!address || address.length < 5) return { valid: false, reason: 'Veuillez saisir une adresse complète.' };
+  if (process.env.NODE_ENV === 'test' && process.env.TEST_BYPASS_SERVICE_AREA === 'true') return { valid: true, distanceKm: 0 };
+  const url = new URL('https://nominatim.openstreetmap.org/search');
+  url.searchParams.set('format', 'jsonv2');
+  url.searchParams.set('limit', '1');
+  url.searchParams.set('countrycodes', 'fr');
+  url.searchParams.set('q', address + ', France');
+  const response = await fetch(url, {
+    headers: { 'User-Agent': 'EpureAutoBooking/1.0 (service-area validation)' },
+    signal: AbortSignal.timeout(5000)
+  });
+  if (!response.ok) throw new Error('Le service de vérification d’adresse est temporairement indisponible. Réessayez dans un instant.');
+  const results = await response.json();
+  if (!Array.isArray(results) || !results.length) return { valid: false, reason: 'Adresse introuvable. Vérifiez l’adresse saisie.' };
+  const first = results[0], point = { lat: Number(first.lat), lon: Number(first.lon) };
+  if (!Number.isFinite(point.lat) || !Number.isFinite(point.lon)) return { valid: false, reason: 'Cette adresse n’a pas pu être vérifiée.' };
+  const distanceKm = haversineKm(SERVICE_AREA_CENTER, point);
+  return distanceKm <= SERVICE_AREA_RADIUS_KM
+    ? { valid: true, distanceKm: Math.round(distanceKm * 10) / 10 }
+    : { valid: false, reason: 'Cette adresse se trouve en dehors de notre zone de déplacement de 25 km autour du Marché Victor Hugo à Angoulême.' };
+}
+
 const ALLOWED_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const EXTENSIONS = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
 
@@ -432,7 +464,7 @@ app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true, limit: '100kb' }));
 
 // Explicit allow-list: do not accidentally publish server.js, environment files, or data.
-const PUBLIC_FILES = new Set(['/', '/index.html', '/styles.css', '/app.js', '/admin.html', '/admin.js', '/success.html', '/reservation-annulee.html']);
+const PUBLIC_FILES = new Set(['/', '/index.html', '/styles.css', '/app.js', '/admin.html', '/admin.js', '/success.html', '/reservation-annulee.html', '/mentions-legales.html', '/politique-confidentialite.html', '/cgv.html']);
 app.get([...PUBLIC_FILES], (req, res, next) => {
   const file = req.path === '/' ? 'index.html' : req.path.slice(1);
   res.sendFile(path.join(__dirname, file), e => { if (e) next(e); });
