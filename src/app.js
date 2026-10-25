@@ -86,6 +86,23 @@ async function loadSlots() {
   }
 }
 
+function updateEarlyExecutionConsent() {
+  const wrapper = $('#earlyExecutionConsentWrap');
+  const checkbox = $('#earlyExecutionRequested');
+  const dateField = $('#date');
+  if (!wrapper || !checkbox || !dateField || !dateField.value) return;
+  const today = new Date();
+  const deadline = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  deadline.setDate(deadline.getDate() + 14);
+  const deadlineISO = deadline.getFullYear() + '-' +
+    String(deadline.getMonth() + 1).padStart(2, '0') + '-' +
+    String(deadline.getDate()).padStart(2, '0');
+  const required = dateField.value <= deadlineISO;
+  wrapper.hidden = !required;
+  checkbox.required = required;
+  if (!required) checkbox.checked = false;
+}
+
 function renderSummary() {
   const s = selectedService();
   const d = $('#date').value;
@@ -128,6 +145,7 @@ async function submitBooking(e) {
       email: $('#email').value.trim(),
       address: $('#address').value.trim(),
       legalAccepted: $('#legalAccepted').checked ? 'true' : 'false',
+      earlyExecutionRequested: $('#earlyExecutionRequested')?.checked ? 'true' : 'false',
       note: $('#note').value.trim()
     };
     Object.entries(payload).forEach(([key, value]) => formData.append(key, value));
@@ -140,7 +158,7 @@ async function submitBooking(e) {
   } catch (err) {
     alert(err.message);
     btn.disabled = false;
-    btn.textContent = 'Envoyer ma demande →';
+    btn.textContent = 'Confirmer et payer →';
   }
 }
 
@@ -158,17 +176,19 @@ function init() {
   if (date) {
     date.min = todayISO();
     date.value = todayISO();
+    updateEarlyExecutionConsent();
   }
 
   $$('.service-cta').forEach(b => b.onclick = () => {
     const s = b.dataset.service;
     $('#service').value = `${s} — ${serviceData[s].amount}€`;
     document.querySelector('#reservation').scrollIntoView({ behavior: 'smooth' });
-    setTimeout(loadSlots, 100);
+    current = 1;
+    goStep(2);
   });
 
   $('#service')?.addEventListener('change', loadSlots);
-  $('#date')?.addEventListener('change', loadSlots);
+  $('#date')?.addEventListener('change', () => { loadSlots(); updateEarlyExecutionConsent(); });
   $$('.next-btn').forEach(b => b.addEventListener('click', () => goStep(current + 1)));
   $$('.back-btn').forEach(b => b.addEventListener('click', () => goStep(current - 1)));
   $('#bookingForm')?.addEventListener('submit', submitBooking);

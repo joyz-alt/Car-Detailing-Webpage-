@@ -27,7 +27,9 @@ CREATE TABLE IF NOT EXISTS bookings (
   payment_attempt INTEGER NOT NULL DEFAULT 0 CHECK (payment_attempt >= 0),
   terms_accepted_at TIMESTAMPTZ,
   terms_version TEXT,
-  privacy_version TEXT
+  privacy_version TEXT,
+  early_execution_requested BOOLEAN NOT NULL DEFAULT FALSE,
+  early_execution_requested_at TIMESTAMPTZ
 );
 CREATE INDEX IF NOT EXISTS bookings_date_status_idx
   ON bookings (booking_date, status);

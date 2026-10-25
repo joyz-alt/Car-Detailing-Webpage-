@@ -274,6 +274,8 @@ async function ensureEmailOutboxSchema() {
   await pool.query('ALTER TABLE bookings ADD COLUMN IF NOT EXISTS terms_accepted_at TIMESTAMPTZ');
   await pool.query('ALTER TABLE bookings ADD COLUMN IF NOT EXISTS terms_version TEXT');
   await pool.query('ALTER TABLE bookings ADD COLUMN IF NOT EXISTS privacy_version TEXT');
+  await pool.query('ALTER TABLE bookings ADD COLUMN IF NOT EXISTS early_execution_requested BOOLEAN NOT NULL DEFAULT FALSE');
+  await pool.query('ALTER TABLE bookings ADD COLUMN IF NOT EXISTS early_execution_requested_at TIMESTAMPTZ');
   await pool.query('ALTER TABLE bookings DROP CONSTRAINT IF EXISTS bookings_status_check');
   await pool.query("ALTER TABLE bookings ADD CONSTRAINT bookings_status_check CHECK (status IN ('pending', 'awaiting_payment', 'confirmed', 'declined', 'expired'))");
   await pool.query(
@@ -550,6 +552,7 @@ app.post('/api/bookings', bookingRateLimit, (req, res, next) => {
   const condition = text(body.condition, 100) || 'Non renseigné';
   const note = text(body.note, 1500);
   const legalAccepted = text(body.legalAccepted, 10);
+  const earlyExecutionRequested = text(body.earlyExecutionRequested, 10) === 'true';
   const files = req.files || [];
 
   if (!SERVICES[service] || !date || !time || !firstName || !lastName || !phone || !email || !address || legalAccepted !== 'true') {
@@ -559,6 +562,12 @@ app.post('/api/bookings', bookingRateLimit, (req, res, next) => {
   if (!isValidDate(date) || date < parisToday()) return res.status(400).json({ error: 'La date de réservation est invalide.' });
   if (!SLOTS.includes(time)) return res.status(400).json({ error: 'Créneau invalide.' });
   if (date === parisToday() && slotMinutes(time) <= parisMinutesNow()) return res.status(400).json({ error: 'Ce créneau est déjà passé.' });
+  const withdrawalDeadline = new Date(parisToday() + 'T00:00:00Z');
+  withdrawalDeadline.setUTCDate(withdrawalDeadline.getUTCDate() + 14);
+  const withinWithdrawalWindow = date <= withdrawalDeadline.toISOString().slice(0, 10);
+  if (withinWithdrawalWindow && !earlyExecutionRequested) {
+    return res.status(400).json({ error: 'Pour un rendez-vous dans les 14 prochains jours, veuillez confirmer votre demande expresse de commencement anticipé de la prestation.' });
+  }
   let serviceAddress;
   try { serviceAddress = await validateServiceAddress(address); }
   catch (e) { return res.status(503).json({ error: e.message || 'Vérification d’adresse indisponible. Réessayez.' }); }
@@ -591,10 +600,10 @@ app.post('/api/bookings', bookingRateLimit, (req, res, next) => {
 
     const details = SERVICES[service];
     await client.query(
-      'INSERT INTO bookings (id, service, vehicle, booking_date, booking_time, first_name, last_name, phone, email, address, water, electricity, vehicle_condition, note, amount_eur, duration_minutes, duration_label, status, terms_accepted_at, terms_version, privacy_version) ' +
-      'VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,\'pending\',NOW(),\'2026-10-25\',\'2026-10-25\')',
+      'INSERT INTO bookings (id, service, vehicle, booking_date, booking_time, first_name, last_name, phone, email, address, water, electricity, vehicle_condition, note, amount_eur, duration_minutes, duration_label, status, terms_accepted_at, terms_version, privacy_version, early_execution_requested, early_execution_requested_at) ' +
+      'VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,\'pending\',NOW(),\'2026-10-25\',\'2026-10-25\',$18,CASE WHEN $18 THEN NOW() ELSE NULL END)',
       [id, service, vehicle, date, time, firstName, lastName, phone, email, address, water, electricity, condition, note,
-       details.amount, details.durationMinutes, details.durationLabel]
+       details.amount, details.durationMinutes, details.durationLabel, earlyExecutionRequested]
     );    for (const p of photos) {
       await client.query(
         'INSERT INTO booking_photos (booking_id, object_key, original_name, content_type, size_bytes) VALUES ($1,$2,$3,$4,$5)',
