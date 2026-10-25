@@ -32,7 +32,13 @@ function validateStep(step) {
   }
   if (step === 2 && !$('#time').value) return alert('Choisissez un créneau.'), false;
   if (step === 3) {
-    const ids = ['firstName', 'lastName', 'phone', 'email', 'address'];
+    if (!$('#legalAccepted').checked || !$('#privacyAcknowledged').checked) {
+      alert('Merci d’accepter les CGV et de confirmer avoir pris connaissance de la politique de confidentialité.');
+      return false;
+    }
+    try { validatePhotoFiles($('#photos').files); }
+    catch (err) { alert(err.message); $('#photos').focus(); return false; }
+    const ids = ['firstName', 'lastName', 'phone', 'email', 'streetAddress', 'postcode', 'city'];
     for (const id of ids) {
       const field = $('#' + id);
       if (!field.value.trim()) {
@@ -142,12 +148,15 @@ async function submitBooking(e) {
       lastName: $('#lastName').value.trim(),
       phone: $('#phone').value.trim(),
       email: $('#email').value.trim(),
-      address: $('#address').value.trim(),
+      address: [$('#streetAddress').value.trim(), $('#postcode').value.trim(), $('#city').value.trim()].join(', '),
       legalAccepted: $('#legalAccepted').checked ? 'true' : 'false',
+      privacyAcknowledged: $('#privacyAcknowledged').checked ? 'true' : 'false',
       earlyExecutionRequested: $('#earlyExecutionRequested')?.checked ? 'true' : 'false',
       note: $('#note').value.trim()
     };
     Object.entries(payload).forEach(([key, value]) => formData.append(key, value));
+    validatePhotoFiles($('#photos').files);
+    [...$('#photos').files].forEach(file => formData.append('photos', file));
 
     const r = await fetch('/api/bookings', { method: 'POST', body: formData });
     const data = await r.json();
