@@ -44,7 +44,7 @@ async function validateServiceAddress(address) {
   url.searchParams.set('countrycodes', 'fr');
   url.searchParams.set('q', address + ', France');
   const response = await fetch(url, {
-    headers: { 'User-Agent': 'EpureAutoBooking/1.0 (https://epure-auto.com)' },
+    headers: { 'User-Agent': 'EpureAutoBooking/1.0 (https://epure-auto.com)', 'Referer': 'https://epure-auto.com/' },
     signal: AbortSignal.timeout(5000)
   });
   if (!response.ok) throw new Error('Le service de vérification d’adresse est temporairement indisponible. Réessayez dans un instant.');
