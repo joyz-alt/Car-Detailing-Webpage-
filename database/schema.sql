@@ -1,4 +1,3 @@
--- Run once against the PostgreSQL database before deploying.
 CREATE TABLE IF NOT EXISTS bookings (
   id TEXT PRIMARY KEY,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),

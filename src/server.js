@@ -122,11 +122,11 @@ function detectImageType(buffer) {
   if (buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) {
     return { mime: 'image/jpeg' };
   }
-  if (buffer.length >= 8 && buffer.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) ) {
+  if (buffer.length >= 8 && buffer.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) {
     return { mime: 'image/png' };
   }
   if (buffer.length >= 12 && buffer.toString('ascii', 0, 4) === 'RIFF' &&
-      buffer.toString('ascii', 8, 12) === 'WEBP') {
+    buffer.toString('ascii', 8, 12) === 'WEBP') {
     return { mime: 'image/webp' };
   }
   return null;
@@ -139,8 +139,10 @@ async function uploadPhoto(bookingId, file, detected) {
     Bucket: R2_BUCKET, Key: key, Body: file.buffer, ContentType: detected.mime,
     CacheControl: 'private, max-age=0, no-store', Metadata: { 'booking-id': bookingId }
   }));
-  return { objectKey: key, originalName: path.basename(file.originalname || 'photo').slice(0, 120),
-    contentType: detected.mime, sizeBytes: file.size };
+  return {
+    objectKey: key, originalName: path.basename(file.originalname || 'photo').slice(0, 120),
+    contentType: detected.mime, sizeBytes: file.size
+  };
 }
 async function deleteObjects(objects) {
   if (!r2) return;
@@ -246,7 +248,7 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
 
     await client.query('COMMIT');
   } catch (e) {
-    await client.query('ROLLBACK').catch(() => {});
+    await client.query('ROLLBACK').catch(() => { });
     console.error('[STRIPE WEBHOOK]', e.message);
     return res.status(400).send('Le webhook n’a pas pu être traité.');
   } finally { client.release(); }
@@ -332,7 +334,7 @@ app.post('/api/bookings', upload.array('photos', MAX_PHOTOS), asyncHandler(async
   const files = req.files || [];
 
   if (!SERVICES[service] || !vehicle || !date || !time || !firstName || !lastName || !phone ||
-      !email || !address || !water || !electricity || !condition) {
+    !email || !address || !water || !electricity || !condition) {
     return res.status(400).json({ error: 'Merci de compléter tous les champs obligatoires.' });
   }
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'Adresse e-mail invalide.' });
@@ -372,7 +374,7 @@ app.post('/api/bookings', upload.array('photos', MAX_PHOTOS), asyncHandler(async
       'INSERT INTO bookings (id, service, vehicle, booking_date, booking_time, first_name, last_name, phone, email, address, water, electricity, vehicle_condition, note, amount_eur, duration_minutes, duration_label, status) ' +
       'VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,\'pending\')',
       [id, service, vehicle, date, time, firstName, lastName, phone, email, address, water, electricity, condition, note,
-       details.amount, details.durationMinutes, details.durationLabel]
+        details.amount, details.durationMinutes, details.durationLabel]
     );
     for (const p of photos) {
       await client.query(
@@ -382,7 +384,7 @@ app.post('/api/bookings', upload.array('photos', MAX_PHOTOS), asyncHandler(async
     }
     await client.query('COMMIT');
   } catch (e) {
-    await client.query('ROLLBACK').catch(() => {});
+    await client.query('ROLLBACK').catch(() => { });
     await deleteObjects(photos);
     throw e;
   } finally { client.release(); }
@@ -398,8 +400,10 @@ app.post('/api/bookings', upload.array('photos', MAX_PHOTOS), asyncHandler(async
     .catch(e => console.error('[EMAIL NOUVELLE DEMANDE]', e.message));
 
   res.status(201).json({
-    booking: { id, service, vehicle, date, time, firstName, lastName, amount: SERVICES[service].amount, status: 'pending',
-      photos: photos.map(p => ({ name: p.originalName, type: p.contentType })) },
+    booking: {
+      id, service, vehicle, date, time, firstName, lastName, amount: SERVICES[service].amount, status: 'pending',
+      photos: photos.map(p => ({ name: p.originalName, type: p.contentType }))
+    },
     message: 'Demande envoyée. Votre créneau sera confirmé après vérification.'
   });
 }));
@@ -478,7 +482,7 @@ app.post('/api/admin/bookings/:id/payment', adminGuard, asyncHandler(async (req,
     );
     await client.query('COMMIT');
   } catch (e) {
-    await client.query('ROLLBACK').catch(() => {});
+    await client.query('ROLLBACK').catch(() => { });
     throw e;
   } finally { client.release(); }
 
@@ -515,7 +519,7 @@ async function start() {
 start();
 
 process.on('SIGTERM', async () => {
-  await pool.end().catch(() => {});
+  await pool.end().catch(() => { });
   if (r2) r2.destroy();
   process.exit(0);
 });
