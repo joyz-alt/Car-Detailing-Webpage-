@@ -97,3 +97,26 @@ html, body { overflow-x: hidden; }
 
 .availability-questions{margin-top:4px}.resource-note{margin:-2px 0 12px;padding:12px 14px;border:1px solid rgba(216,255,69,.25);background:rgba(216,255,69,.05);color:var(--muted);font-size:12px;line-height:1.55}.resource-note strong{color:var(--text)}
 @media(max-width:850px){.availability-questions{gap:14px}.availability-questions label{min-width:0}.resource-note{font-size:11px}}
+
+/* Typography and legal-page refinements */
+:root { --body-size: 15px; }
+body { font-size: var(--body-size); }
+.hero h1 { font-size: clamp(48px, 6.8vw, 88px); }
+.hero-copy { font-size: clamp(15px, 1.25vw, 17px); }
+.section-label, .eyebrow { font-size: 11px; }
+.booking-form { max-width: 620px; width: 100%; }
+.form-help { color: var(--muted); font-size: 12px; margin: 8px 0 18px; }
+.terms-check { display: flex; align-items: flex-start; gap: 10px; font-size: 12px; line-height: 1.6; }
+.terms-check input { width: 16px; min-width: 16px; margin: 4px 0 0; }
+.terms-check a { color: var(--accent); text-decoration: underline; }
+.legal-page { max-width: 900px; margin: 0 auto; padding: 140px 24px 90px; }
+.legal-page h1 { font-size: clamp(34px, 5vw, 52px); line-height: 1.08; margin: 18px 0; }
+.legal-page h2 { font-size: clamp(21px, 3vw, 28px); margin: 34px 0 10px; }
+.legal-page p, .legal-page li { color: #c3c8cd; font-size: 15px; line-height: 1.75; }
+.legal-notice { border: 1px solid #6b5b20; background: rgba(216,255,69,.06); padding: 15px 18px; color: #e6dca7; margin: 24px 0; }
+.legal-footer { display:flex; gap:18px; flex-wrap:wrap; padding-top:28px; border-top:1px solid var(--line); margin-top:48px; color:var(--muted); font-size:13px; }
+.status-expired { color:#9ca1aa; }
+@media(max-width:850px) { .hero h1 { font-size: clamp(42px, 11vw, 60px); line-height: .98; } .legal-page { padding: 112px 20px 80px; } .legal-page h1 { font-size: 36px; } .legal-page p, .legal-page li { font-size: 14px; } }
+
+.legal-consent-note { margin: 12px 0 18px; padding: 12px 14px; border-left: 2px solid var(--accent); background: rgba(216,255,69,.04); }
+.legal-consent-note .terms-check { font-size: 11px; }

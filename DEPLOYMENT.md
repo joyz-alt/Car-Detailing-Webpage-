@@ -66,3 +66,12 @@
 
 ## Cloudflare R2 budget note
 The account setup screen reviewed on 25 October 2026 showed $0/month with monthly allowances of 10 GB storage, 1 million Class A operations, 10 million Class B operations and zero egress fees. The screen showed overage prices of $0.015 per GB-month, $4.50 per million Class A operations and $0.36 per million Class B operations. Pricing can change; verify the current Cloudflare billing page and monitor usage.
+
+
+## Legal and booking release gate
+- Complete all bracketed fields in `src/mentions-legales.html`, `src/politique-confidentialite.html`, and `src/cgv.html` with verified business/provider details and final policies before accepting live customers. These pages are drafts, not legal approval.
+- The service-area reference is Marché Victor Hugo, Place Victor Hugo, Angoulême (45.64889, 0.17426). The backend uses a straight-line radius of 25 km and OpenStreetMap Nominatim geocoding. Address checking runs once at submission; unresolved addresses are blocked.
+- The booking form asks only for service, date/time, contact details, address and terms acceptance. Vehicle and on-site resource details are no longer required; legacy DB columns use “Non renseigné”.
+- When Stripe and its webhook are configured, the customer goes straight to Stripe Checkout without manual approval. Only a verified Stripe webhook confirms payment; expired Checkout sessions release their slots. If Stripe is not configured, the system uses a manual-review fallback and informs the customer.
+- The terms acceptance timestamp and accepted legal-text versions are stored per booking. Update the version strings in the booking insert when legal text changes.
+- Service-area bypass is enabled only for integration tests with `NODE_ENV=test` and `TEST_BYPASS_SERVICE_AREA=true`. Never set these values in production.

@@ -48,7 +48,6 @@ async function waitForHealth(timeoutMs = 12000) {
 function buildBookingForm(overrides = {}) {
   const fields = {
     service: 'Essentiel',
-    vehicle: 'Citadine / compacte',
     date: bookingDate,
     time: '09:00',
     firstName: 'Test',
@@ -56,9 +55,7 @@ function buildBookingForm(overrides = {}) {
     phone: '+33600000000',
     email: 'client@example.test',
     address: '1 rue de Test, Angoulême',
-    water: 'Oui',
-    electricity: 'Oui',
-    condition: 'Sale',
+    legalAccepted: 'true',
     note: 'Réservation d’intégration automatisée'
   };
   Object.assign(fields, overrides);
@@ -88,6 +85,8 @@ before(async () => {
     env: {
       ...process.env,
       DATABASE_URL: TEST_DATABASE_URL,
+      NODE_ENV: 'test',
+      TEST_BYPASS_SERVICE_AREA: 'true',
       PGSSL: 'false',
       PORT: String(port),
       ADMIN_KEY: adminKey,
@@ -140,14 +139,14 @@ test('a valid customer request is stored and queues two notifications', async ()
   const payload = await response.json();
   assert.equal(response.status, 201, JSON.stringify(payload));
   assert.equal(payload.booking.service, 'Essentiel');
-  assert.equal(payload.booking.amount, 59);
+  assert.equal(payload.booking.amount, 75);
   assert.equal(payload.booking.status, 'pending');
   firstBookingId = payload.booking.id;
 
   const stored = await pool.query('SELECT id, status, amount_eur FROM bookings WHERE id = $1', [firstBookingId]);
   assert.equal(stored.rowCount, 1);
   assert.equal(stored.rows[0].status, 'pending');
-  assert.equal(Number(stored.rows[0].amount_eur), 59);
+  assert.equal(Number(stored.rows[0].amount_eur), 75);
 
   const outbox = await pool.query(
     'SELECT recipient, dedupe_key FROM email_outbox WHERE booking_id = $1 ORDER BY dedupe_key',
