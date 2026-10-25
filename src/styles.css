@@ -144,3 +144,23 @@ body { font-size: var(--body-size); }
   .form-actions { flex-wrap: wrap; }
   .form-actions .btn { min-width: 0; }
 }
+
+
+/* Customer photo selection: add files in batches and remove individual selections. */
+.photo-upload-field { margin: 14px 0 18px; }
+.photo-upload-field > label { margin-bottom: 6px; }
+.photo-list { list-style: none; padding: 0; margin: 10px 0 0; display: grid; gap: 7px; }
+.photo-list:empty { display: none; }
+.photo-list-item { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 10px; padding: 9px 10px; border: 1px solid var(--line); background: #15191e; font-size: 12px; min-width: 0; }
+.photo-file-name { overflow-wrap: anywhere; color: var(--text); }
+.photo-list-item small { color: var(--muted); white-space: nowrap; }
+.photo-remove { border: 1px solid #5b3434; color: #ffaaaa; background: transparent; padding: 6px 9px; cursor: pointer; font-size: 11px; }
+.photo-remove:hover { background: rgba(255,125,125,.1); }
+.photo-remove:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.photo-count { font-size: 11px; color: var(--muted); margin: 8px 0 0; }
+@media (max-width: 420px) {
+  .photo-list-item { grid-template-columns: minmax(0, 1fr) auto; gap: 6px 8px; }
+  .photo-file-name { grid-column: 1; }
+  .photo-list-item small { grid-column: 1; }
+  .photo-remove { grid-column: 2; grid-row: 1 / span 2; }
+}
