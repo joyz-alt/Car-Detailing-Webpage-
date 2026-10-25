@@ -208,3 +208,12 @@ test('payment cannot be initiated when Stripe and its webhook are not configured
   assert.equal(response.status, 503);
   assert.match((await response.json()).error, /Stripe|webhook/i);
 });
+
+test('Stripe webhook is unavailable when Stripe is not configured', async () => {
+  const response = await fetch(baseUrl + '/api/stripe/webhook', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ id: 'evt_test_disabled', type: 'checkout.session.completed', data: { object: {} } })
+  });
+  assert.equal(response.status, 503);
+});
