@@ -133,8 +133,8 @@
           </div>
           <div class="step"><span>02</span>
             <div>
-              <h3>Indiquez votre véhicule</h3>
-              <p>Renseignez le type de véhicule, son état et, si vous le souhaitez, ajoutez quelques photos.</p>
+              <h3>Ajoutez des précisions si besoin</h3>
+              <p>Vous pouvez joindre quelques photos facultatives pour nous aider à évaluer l’état de l’habitacle avant le rendez-vous.</p>
             </div>
           </div>
           <div class="step"><span>03</span>
@@ -210,7 +210,7 @@
           <div class="section-label">07 — RÉSERVATION</div>
           <h2>Réservez votre prestation.<br><span>En quelques clics.</span></h2>
           <p>Deux formules, une adresse et un créneau disponible. Réservez en quelques étapes, sans choix inutiles.</p>
-          <div class="booking-points"><span>✓ Deux formules simples</span><span>✓ Adresse vérifiée dans la zone de 25 km</span><span>✓ Paiement sécurisé en ligne</span></div>
+          <div class="booking-points"><span>Deux formules simples</span><span>Adresse vérifiée dans la zone de 25 km</span><span>Paiement sécurisé lorsque disponible</span></div>
         </div>
 
         <form class="booking-form" id="bookingForm">
@@ -250,10 +250,24 @@
                   autocomplete="family-name"></label></div>
             <label>Téléphone<input id="phone" type="tel" required autocomplete="tel"></label>
             <label>E-mail<input id="email" type="email" required autocomplete="email"></label>
-            <label>Adresse complète d’intervention<input id="address" required autocomplete="street-address"
-                placeholder="Numéro, rue, code postal, commune"></label>
-            <div class="summary" id="summary"></div>
-            <label class="terms-check"><input id="legalAccepted" type="checkbox" required> J’ai lu et j’accepte les <a href="cgv.html" target="_blank" rel="noopener noreferrer">conditions générales de vente</a> et pris connaissance de la <a href="politique-confidentialite.html" target="_blank" rel="noopener noreferrer">politique de confidentialité</a>.</label>
+            <fieldset class="address-fields">
+              <legend>Adresse d’intervention</legend>
+              <label for="streetAddress">Numéro et nom de rue<input id="streetAddress" required autocomplete="address-line1" placeholder="12 rue des Lilas"></label>
+              <div class="two-col">
+                <label for="postcode">Code postal<input id="postcode" required inputmode="numeric" autocomplete="postal-code" pattern="[0-9]{5}" maxlength="5" placeholder="16000"></label>
+                <label for="city">Commune<input id="city" required autocomplete="address-level2" placeholder="Angoulême"></label>
+              </div>
+            </fieldset>
+            <label for="photos">Photos du véhicule (facultatif)
+              <input id="photos" name="photos" type="file" accept="image/jpeg,image/png,image/webp" multiple aria-describedby="photosHelp">
+            </label>
+            <p class="form-help" id="photosHelp">JPG, PNG ou WEBP · 5 photos maximum · 5 Mo par photo. Évitez d’inclure des personnes ou des informations personnelles visibles.</p>
+            <label for="note">Précisions utiles (facultatif)<textarea id="note" rows="3" maxlength="1500" placeholder="Taches particulières, poils d’animaux, détails utiles…"></textarea></label>
+            <div class="summary" id="summary" aria-live="polite"></div>
+            <div class="legal-checks">
+              <label class="terms-check" for="legalAccepted"><input id="legalAccepted" type="checkbox" required> <span>J’accepte les <a href="cgv.html" target="_blank" rel="noopener noreferrer">conditions générales de vente</a>.</span></label>
+              <label class="terms-check" for="privacyAcknowledged"><input id="privacyAcknowledged" type="checkbox" required> <span>J’ai pris connaissance de la <a href="politique-confidentialite.html" target="_blank" rel="noopener noreferrer">politique de confidentialité</a>.</span></label>
+            </div>
             <div id="earlyExecutionConsentWrap" class="legal-consent-note" hidden>
               <label class="terms-check"><input id="earlyExecutionRequested" type="checkbox"> Je souhaite que le nettoyage commence avant la fin du délai de rétractation de 14 jours et comprends que je ne pourrai plus me rétracter une fois le nettoyage entièrement terminé.</label>
               <p class="form-help">Si vous vous rétractez après le début du nettoyage, la partie déjà réalisée pourra être facturée.</p>
