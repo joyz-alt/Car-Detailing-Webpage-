@@ -117,3 +117,6 @@ body { font-size: var(--body-size); }
 .legal-footer { display:flex; gap:18px; flex-wrap:wrap; padding-top:28px; border-top:1px solid var(--line); margin-top:48px; color:var(--muted); font-size:13px; }
 .status-expired { color:#9ca1aa; }
 @media(max-width:850px) { .hero h1 { font-size: clamp(42px, 11vw, 60px); line-height: .98; } .legal-page { padding: 112px 20px 80px; } .legal-page h1 { font-size: 36px; } .legal-page p, .legal-page li { font-size: 14px; } }
+
+.legal-consent-note { margin: 12px 0 18px; padding: 12px 14px; border-left: 2px solid var(--accent); background: rgba(216,255,69,.04); }
+.legal-consent-note .terms-check { font-size: 11px; }

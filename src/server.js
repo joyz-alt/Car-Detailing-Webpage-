@@ -604,7 +604,8 @@ app.post('/api/bookings', bookingRateLimit, (req, res, next) => {
       'VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,\'pending\',NOW(),\'2026-10-25\',\'2026-10-25\',$18,CASE WHEN $18 THEN NOW() ELSE NULL END)',
       [id, service, vehicle, date, time, firstName, lastName, phone, email, address, water, electricity, condition, note,
        details.amount, details.durationMinutes, details.durationLabel, earlyExecutionRequested]
-    );    for (const p of photos) {
+    );
+    for (const p of photos) {
       await client.query(
         'INSERT INTO booking_photos (booking_id, object_key, original_name, content_type, size_bytes) VALUES ($1,$2,$3,$4,$5)',
         [id, p.objectKey, p.originalName, p.contentType, p.sizeBytes]
@@ -650,7 +651,7 @@ app.post('/api/bookings', bookingRateLimit, (req, res, next) => {
       dedupeKey: 'booking:' + id + ':request-received-customer',
       bookingId: id,
       recipient: email,
-      subject: 'Épure Auto — demande de réservation reçue',
+      subject: paymentSession ? 'Épure Auto — finalisez votre réservation' : 'Épure Auto — demande de réservation reçue',
       htmlBody: paymentSession
         ? '<p>Bonjour ' + escapeHtml(firstName) + ',</p><p>Votre réservation a été enregistrée pour <strong>' + escapeHtml(service) + '</strong>, le <strong>' + escapeHtml(date) + '</strong> à <strong>' + escapeHtml(time) + '</strong>.</p><p>Pour confirmer le rendez-vous, effectuez le paiement sécurisé : <a href="' + escapeHtml(paymentSession.url) + '">payer et confirmer mon rendez-vous</a>. Ce lien expire dans 35 minutes.</p><p>Si vous ne voyez pas cet e-mail dans votre boîte de réception, vérifiez vos courriers indésirables (spam).</p><p>À bientôt,<br>Épure Auto</p>'
         : '<p>Bonjour ' + escapeHtml(firstName) + ',</p><p>Nous avons bien reçu votre demande pour la prestation <strong>' + escapeHtml(service) + '</strong> le <strong>' + escapeHtml(date) + '</strong> à <strong>' + escapeHtml(time) + '</strong>.</p><p>La demande attend une validation manuelle car le paiement en ligne n’est pas disponible. Nous vous recontacterons après vérification.</p><p>Si vous ne voyez pas cet e-mail dans votre boîte de réception, vérifiez vos courriers indésirables (spam).</p><p>À bientôt,<br>Épure Auto</p>'

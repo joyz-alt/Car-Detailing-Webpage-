@@ -129,9 +129,8 @@ function validatePhotoFiles(fileList) {
 async function submitBooking(e) {
   e.preventDefault();
   if (!validateStep(3)) return;
-  const btn = e.submitter;
-  btn.disabled = true;
-  btn.textContent = 'Envoi…';
+  const btn = e.submitter || $('#bookingForm button[type="submit"]');
+  if (btn) { btn.disabled = true; btn.textContent = 'Envoi…'; }
 
   try {
     const formData = new FormData();
@@ -157,8 +156,7 @@ async function submitBooking(e) {
     $('#bookingForm').innerHTML = '<div class="booking-success" role="status" aria-live="polite"><div class="success-mark">✓</div><small>DEMANDE ENVOYÉE</small><h3>Votre demande est enregistrée.</h3><p>Le paiement en ligne n’est pas disponible pour le moment. Nous devons vérifier votre demande manuellement avant de confirmer le rendez-vous.</p><p>Si vous ne recevez pas notre e-mail, vérifiez vos courriers indésirables (spam).</p><a class="btn btn-primary" href="#prestations">Voir les prestations</a></div>';
   } catch (err) {
     alert(err.message);
-    btn.disabled = false;
-    btn.textContent = 'Confirmer et payer →';
+    if (btn) { btn.disabled = false; btn.textContent = 'Confirmer et payer →'; }
   }
 }
 
