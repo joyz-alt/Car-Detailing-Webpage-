@@ -13,6 +13,7 @@ const app = express();
 app.set('trust proxy', 1);
 const PORT = Number(process.env.PORT || 3000);
 const ADMIN_KEY = process.env.ADMIN_KEY || '';
+const ADMIN_EMAIL = String(process.env.ADMIN_EMAIL || '').trim();
 if (ADMIN_KEY && ADMIN_KEY.length < 32) {
   console.error('ADMIN_KEY must be at least 32 characters long.');
   process.exit(1);
@@ -132,7 +133,8 @@ async function deliverEmail(message) {
       method: 'POST',
       headers: {
         Authorization: 'Bearer ' + process.env.RESEND_API_KEY,
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'Idempotency-Key': 'epure-email-' + message.id
       },
       body: JSON.stringify({
         from: process.env.MAIL_FROM,
@@ -694,7 +696,7 @@ app.post('/api/admin/bookings/:id/payment', adminGuard, asyncHandler(async (req,
     throw e;
   } finally { client.release(); }
 
-  await processEmailQueue();
+  void processEmailQueue().catch(e => console.error('[EMAIL PAYMENT QUEUE]', e.message));
   const emailResult = await pool.query(
     'SELECT status FROM email_outbox WHERE dedupe_key = $1',
     ['booking:' + booking.id + ':payment:' + session.id]
