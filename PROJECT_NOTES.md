@@ -33,10 +33,10 @@ The booking and legal groundwork has been implemented in the code on `main`, but
 - [ ] Confirm database schema/migrations and environment variables are correctly configured in production.
 
 #### Priority 2 — booking form and front end
-- [x] Added optional photo upload to the customer booking form (JPG/PNG/WEBP, maximum 5 photos and 5 MB each; requires configured Cloudflare R2 storage to work in production).
+- [x] Added optional photo upload to the customer booking form (JPG/PNG/WEBP, maximum 5 photos and 5 MB each; customers can add photos in batches and remove individual selections; requires configured Cloudflare R2 storage to work in production).
 - [x] Split the intervention address into street, postcode and town/city fields; the front end combines them into the existing address payload for server-side validation.
 - [x] Combined CGV acceptance and privacy-policy acknowledgement into one required checkbox, with the two links displayed together in a single clean, wrapping line/block.
-- [x] Refined booking-form typography, spacing, field sizing and mobile layout; visual review on real devices is still required.
+- [x] Refined booking-form typography, spacing, field sizing, removable photo-selection list and mobile layout; visual review on real devices is still required.
 - [x] Removed the remaining vehicle-details wording from the “Comment ça marche” steps and removed checkmark glyphs from the booking reassurance list. Confirm no old water/electricity prompts remain elsewhere during the final site review.
 - [x] Updated the “Comment ça marche” steps to explain that optional photos can be provided instead of requiring vehicle details.
 - [ ] Replace the temporary results/photo placeholders with real, permission-cleared before/after photos when available.
