@@ -20,10 +20,6 @@ async function api(url, opts = {}) {
   return d;
 }
 
-function money(n) {
-  return `${n} €`;
-}
-
 function escapeHtml(value) {
   return String(value == null ? '' : value).replace(/[&<>"']/g, c => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
@@ -82,29 +78,95 @@ async function render() {
     const data = await api('/api/admin/bookings');
     renderBookings(data);
   } catch (e) {
-    $('#bookings').innerHTML = `<li class="empty">${e.message}</li>`;
+    $('#bookings').innerHTML = `<li class="empty">${escapeHtml(e.message)}</li>`;
   }
 
   try {
-    const r = await api('/api/admin/blocks');
-    renderBlocks(r);
+    renderBlocks(await api('/api/admin/blocks'));
   } catch (e) {
-    /* handled below */
+    $('#blocks').innerHTML = `<li class="empty">${escapeHtml(e.message)}</li>`;
   }
-}
-async function renderBlocks() {
-  const r = await api('/api/admin/blocks').catch(() => []);
-  const box = $('#blocks');
 
-  if (!Array.isArray(r) || !r.length) {
+  await renderNotifications();
+}
+
+function renderBlocks(rows) {
+  const box = $('#blocks');
+  if (!Array.isArray(rows) || !rows.length) {
     box.innerHTML = '<li class="empty">Aucun créneau bloqué.</li>';
     return;
-  } box.innerHTML = r.map(b => `<li><span>${b.date} · ${b.time}</span><button class="danger" onclick="removeBlock('${b.id}')">Supprimer</button></li>`).join('');
+  }
+  box.innerHTML = rows.map(b =>
+    '<li><span>' + escapeHtml(b.date) + ' · ' + escapeHtml(b.time) +
+    '</span><button class="danger" data-action="remove-block" data-id="' + escapeHtml(b.id) +
+    '">Supprimer</button></li>'
+  ).join('');
 }
+
+const emailStatusLabel = {
+  pending: 'En attente', sending: 'En cours d’envoi', sent: 'Envoyé', failed: 'Échec'
+};
+async function renderNotifications() {
+  const provider = $('#emailProvider');
+  const box = $('#emailOutbox');
+  if (!provider || !box) return;
+  try {
+    const data = await api('/api/admin/email-outbox');
+    provider.textContent = data.configured
+      ? 'Fournisseur : ' + data.provider + ' · File de notifications'
+      : 'Aucun fournisseur e-mail valide. Configurez Resend (recommandé) ou SMTP avant de recevoir des réservations.';
+    if (!data.messages.length) {
+      box.innerHTML = '<li class="empty">Aucune notification en file.</li>';
+      return;
+    }
+    box.innerHTML = data.messages.map(m =>
+      '<li class="booking-admin-item"><div><strong>' + escapeHtml(m.subject) + '</strong><br>' +
+      '<span class="empty">' + escapeHtml(m.recipient) + ' · ' +
+      escapeHtml(emailStatusLabel[m.status] || m.status) + ' · tentatives : ' +
+      escapeHtml(m.attempts) + '</span>' +
+      (m.lastError ? '<br><span class="photo-count">' + escapeHtml(m.lastError) + '</span>' : '') +
+      (m.sentAt ? '<br><span class="empty">Envoyé le ' + escapeHtml(new Date(m.sentAt).toLocaleString('fr-FR')) + '</span>' : '') +
+      '</div><div class="admin-actions">' +
+      (m.status === 'failed'
+        ? '<button class="btn btn-secondary btn-small" data-action="retry-email" data-id="' + escapeHtml(m.id) + '">Réessayer</button>'
+        : '') +
+      '</div></li>'
+    ).join('');
+  } catch (e) {
+    provider.textContent = 'Impossible de lire la file e-mail : ' + e.message;
+    box.innerHTML = '';
+  }
+}
+
+$('#emailOutbox').addEventListener('click', async event => {
+  const button = event.target.closest('button[data-action="retry-email"]');
+  if (!button) return;
+  button.disabled = true;
+  try {
+    await api('/api/admin/email-outbox/' + encodeURIComponent(button.dataset.id) + '/retry', { method: 'POST' });
+    await renderNotifications();
+  } catch (e) {
+    alert(e.message);
+    button.disabled = false;
+  }
+});
+
+$('#blocks').addEventListener('click', async event => {
+  const button = event.target.closest('button[data-action="remove-block"]');
+  if (!button) return;
+  await removeBlock(button.dataset.id);
+});
+
 async function sendPayment(id) {
   try {
     const d = await api(`/api/admin/bookings/${id}/payment`, { method: 'POST' });
-    alert(d.emailSent ? 'Paiement envoyé par e-mail au client.' : 'Stripe est prêt. Le lien de paiement est disponible dans la réservation.');
+    if (d.emailSent) {
+      alert('Le lien de paiement a été envoyé au client par e-mail.');
+    } else if (d.emailStatus === 'failed') {
+      alert('Le lien Stripe a été créé, mais l’e-mail a échoué. Consultez « Notifications e-mail » puis réessayez.');
+    } else {
+      alert('Le lien de paiement est créé. L’e-mail est en cours de traitement ou en attente ; son statut apparaît dans « Notifications e-mail ».');
+    }
     render();
   } catch (e) {
     alert(e.message);
@@ -122,8 +184,8 @@ async function decline(id) {
 }
 async function removeBlock(id) {
   try {
-    await api(`/api/admin/blocks/${id}`, { method: 'DELETE' });
-    renderBlocks();
+    await api('/api/admin/blocks/' + encodeURIComponent(id), { method: 'DELETE' });
+    renderBlocks(await api('/api/admin/blocks'));
   } catch (e) {
     alert(e.message);
   }
@@ -142,6 +204,7 @@ $('#blockBtn').onclick = async () => {
   }
 };
 $('#clearBtn').onclick = () => render();
+$('#refreshEmails').onclick = () => renderNotifications();
 if (!ADMIN_KEY) { 
   ADMIN_KEY = prompt('Clé administrateur (ADMIN_KEY) :') || ''; 
   
