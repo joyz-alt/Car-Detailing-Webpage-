@@ -10,7 +10,8 @@ Site vitrine et système de demande de réservation pour Épure Auto à Angoulê
 - Photos client : bucket Cloudflare R2 privé
 - Paiement : Stripe Checkout avec validation via webhook
 - Notifications : Resend HTTPS API (prioritaire) ou SMTP en solution de repli
-- Tests de syntaxe : `npm run check`
+- Vérifications de syntaxe : `npm run check`
+- Tests d'intégration avec PostgreSQL : `npm test` (exige `TEST_DATABASE_URL` pointant vers une base de test jetable, jamais la production)
 
 ## Démarrage local
 1. Installez Node.js 20 ou plus récent.
