@@ -54,3 +54,22 @@ CREATE TABLE IF NOT EXISTS stripe_events (
   event_type TEXT NOT NULL,
   processed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Transactional outbox for reliable, deduplicated email delivery.
+CREATE TABLE IF NOT EXISTS email_outbox (
+  id BIGSERIAL PRIMARY KEY,
+  dedupe_key TEXT NOT NULL UNIQUE,
+  booking_id TEXT REFERENCES bookings(id) ON DELETE SET NULL,
+  recipient TEXT NOT NULL,
+  subject TEXT NOT NULL,
+  html_body TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'sending', 'sent', 'failed')),
+  attempts INTEGER NOT NULL DEFAULT 0 CHECK (attempts >= 0),
+  next_attempt_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  locked_at TIMESTAMPTZ,
+  last_error TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  sent_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS email_outbox_pending_idx
+  ON email_outbox (status, next_attempt_at, created_at);
