@@ -53,3 +53,18 @@
 - PostgreSQL and R2 are required for production bookings with photos. A booking without photos can be submitted if R2 is not configured, but configure R2 before enabling photo uploads.
 - The schema includes payment webhook idempotency. Configure both checkout.session.completed and checkout.session.expired events.
 - package-lock.json will need regenerating after the dependency changes: run npm install in the repository root and commit the updated lockfile.
+
+
+## Budget note — Cloudflare R2 (based on account checkout shown on 25 October 2026)
+The R2 checkout screen showed **$0/month** with these included monthly allowances:
+- Storage: 10 GB/month
+- Class A operations: 1 million/month
+- Class B operations: 10 million/month
+- Egress: zero egress fees
+
+Displayed overage rates:
+- Storage: $0.015 per GB-month
+- Class A operations: $4.50 per million
+- Class B operations: $0.36 per million
+
+This is the price shown in the user's Cloudflare account at setup time, not a guarantee of future pricing. Check the Cloudflare billing page before launch and monitor usage. Keep the customer-photo bucket private.
