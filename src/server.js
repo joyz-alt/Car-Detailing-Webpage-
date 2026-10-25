@@ -171,10 +171,18 @@ async function enqueueEmail(db, message) {
 }
 
 let emailWorkerRunning = false;
+let lastEmailOutboxCleanupAt = 0;
 async function processEmailQueue() {
   if (emailWorkerRunning) return;
   emailWorkerRunning = true;
   try {
+    if (Date.now() - lastEmailOutboxCleanupAt >= 24 * 60 * 60 * 1000) {
+      await pool.query(
+        "DELETE FROM email_outbox WHERE (status = 'sent' AND sent_at < NOW() - INTERVAL '30 days') " +
+        "OR (status = 'failed' AND created_at < NOW() - INTERVAL '90 days')"
+      );
+      lastEmailOutboxCleanupAt = Date.now();
+    }
     const client = await pool.connect();
     let jobs = [];
     try {
@@ -230,6 +238,9 @@ async function processEmailQueue() {
 }
 
 async function ensureEmailOutboxSchema() {
+  await pool.query(
+    'ALTER TABLE bookings ADD COLUMN IF NOT EXISTS payment_attempt INTEGER NOT NULL DEFAULT 0'
+  );
   await pool.query(
     "CREATE TABLE IF NOT EXISTS email_outbox (" +
     "id BIGSERIAL PRIMARY KEY, " +
@@ -636,21 +647,41 @@ app.delete('/api/admin/blocks/:id', adminGuard, asyncHandler(async (req, res) =>
 }));
 
 app.post('/api/admin/bookings/:id/decline', adminGuard, asyncHandler(async (req, res) => {
-  const booking = await getBooking(pool, req.params.id, false);
-  if (!booking) return res.status(404).json({ error: 'Réservation introuvable.' });
-  if (booking.status !== 'pending') return res.status(409).json({ error: 'Seule une demande en attente peut être refusée.' });
-  const changed = await pool.query(
-    'UPDATE bookings SET status = \'declined\' WHERE id = $1 AND status = \'pending\'',
-    [req.params.id]
-  );
-  if (!changed.rowCount) return res.status(409).json({ error: 'Le statut a changé. Actualisez la page.' });
-  await enqueueEmail(pool, {
-    dedupeKey: 'booking:' + booking.id + ':declined',
-    bookingId: booking.id,
-    recipient: booking.email,
-    subject: 'Épure Auto — demande ' + booking.id,
-    htmlBody: '<p>Bonjour ' + escapeHtml(booking.firstName) + ',</p><p>Nous sommes désolés, le créneau demandé n’est finalement pas disponible. Nous reviendrons vers vous pour proposer un autre créneau.</p>'
-  });
+  const client = await pool.connect();
+  let booking;
+  try {
+    await client.query('BEGIN');
+    booking = await getBooking(client, req.params.id, true);
+    if (!booking) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Réservation introuvable.' });
+    }
+    if (booking.status !== 'pending') {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ error: 'Seule une demande en attente peut être refusée.' });
+    }
+    const changed = await client.query(
+      "UPDATE bookings SET status = 'declined' WHERE id = $1 AND status = 'pending' RETURNING id",
+      [req.params.id]
+    );
+    if (!changed.rowCount) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ error: 'Le statut a changé. Actualisez la page.' });
+    }
+    await enqueueEmail(client, {
+      dedupeKey: 'booking:' + booking.id + ':declined',
+      bookingId: booking.id,
+      recipient: booking.email,
+      subject: 'Épure Auto — demande ' + booking.id,
+      htmlBody: '<p>Bonjour ' + escapeHtml(booking.firstName) + ',</p><p>Nous sommes désolés, le créneau demandé n’est finalement pas disponible. Nous reviendrons vers vous pour proposer un autre créneau.</p>'
+    });
+    await client.query('COMMIT');
+  } catch (e) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw e;
+  } finally {
+    client.release();
+  }
   void processEmailQueue().catch(e => console.error('[EMAIL REFUS QUEUE]', e.message));
   res.json({ ok: true });
 }));
@@ -670,6 +701,11 @@ app.post('/api/admin/bookings/:id/payment', adminGuard, asyncHandler(async (req,
       return res.status(400).json({ error: 'Cette réservation ne peut pas être envoyée au paiement.' });
     }
 
+    const attemptResult = await client.query(
+      'UPDATE bookings SET payment_attempt = payment_attempt + 1 WHERE id = $1 RETURNING payment_attempt',
+      [booking.id]
+    );
+    const paymentAttempt = attemptResult.rows[0].payment_attempt;
     session = await stripe.checkout.sessions.create({
       mode: 'payment',
       customer_email: booking.email,
@@ -686,6 +722,8 @@ app.post('/api/admin/bookings/:id/payment', adminGuard, asyncHandler(async (req,
       success_url: publicBaseUrl() + '/success.html?booking=' + encodeURIComponent(booking.id),
       cancel_url: publicBaseUrl() + '/reservation-annulee.html?booking=' + encodeURIComponent(booking.id),
       expires_at: Math.floor(Date.now() / 1000) + 30 * 60
+    }, {
+      idempotencyKey: 'epure-booking-' + booking.id + '-payment-' + paymentAttempt
     });
 
     if (!session.url) throw new Error('Stripe did not return a Checkout URL.');
