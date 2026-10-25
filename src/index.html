@@ -258,10 +258,14 @@
                 <label for="city">Commune<input id="city" required autocomplete="address-level2" placeholder="Angoulême"></label>
               </div>
             </fieldset>
-            <label for="photos">Photos du véhicule (facultatif)
-              <input id="photos" name="photos" type="file" accept="image/jpeg,image/png,image/webp" multiple aria-describedby="photosHelp">
-            </label>
-            <p class="form-help" id="photosHelp">JPG, PNG ou WEBP · 5 photos maximum · 5 Mo par photo. Évitez d’inclure des personnes ou des informations personnelles visibles.</p>
+            <div class="photo-upload-field">
+              <label for="photos">Photos du véhicule (facultatif)
+                <input id="photos" name="photos" type="file" accept="image/jpeg,image/png,image/webp" multiple aria-describedby="photosHelp">
+              </label>
+              <p class="form-help" id="photosHelp">JPG, PNG ou WEBP · 5 photos maximum · 5 Mo par photo. Vous pouvez ajouter les photos en plusieurs fois et retirer celles que vous ne souhaitez pas envoyer. Évitez d’inclure des personnes ou des informations personnelles visibles.</p>
+              <ul id="photoList" class="photo-list" aria-label="Photos sélectionnées" aria-live="polite"></ul>
+              <p id="photoCount" class="photo-count" aria-live="polite">Aucune photo sélectionnée.</p>
+            </div>
             <label for="note">Précisions utiles (facultatif)<textarea id="note" rows="3" maxlength="1500" placeholder="Taches particulières, poils d’animaux, détails utiles…"></textarea></label>
             <div class="summary" id="summary" aria-live="polite"></div>
             <div class="legal-checks">
