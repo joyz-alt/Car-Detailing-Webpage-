@@ -120,6 +120,12 @@ function renderSummary() {
 }
 
 let selectedPhotos = [];
+const photoPreviewUrls = new WeakMap();
+
+function photoPreviewUrl(file) {
+  if (!photoPreviewUrls.has(file)) photoPreviewUrls.set(file, URL.createObjectURL(file));
+  return photoPreviewUrls.get(file);
+}
 
 function validatePhotoFiles(fileList) {
   const files = [...fileList];
@@ -152,25 +158,32 @@ function renderPhotoList() {
     const item = document.createElement('li');
     item.className = 'photo-list-item';
 
+    item.classList.add('photo-thumbnail');
+
+    const preview = document.createElement('img');
+    preview.className = 'photo-preview';
+    preview.src = photoPreviewUrl(file);
+    preview.alt = `Aperçu de la photo ${index + 1}`;
+    preview.loading = 'lazy';
+
     const name = document.createElement('span');
     name.className = 'photo-file-name';
     name.textContent = file.name;
-
-    const size = document.createElement('small');
-    size.textContent = `${(file.size / (1024 * 1024)).toFixed(2)} Mo`;
+    name.title = file.name;
 
     const remove = document.createElement('button');
     remove.type = 'button';
     remove.className = 'photo-remove';
-    remove.textContent = 'Retirer';
-    remove.setAttribute('aria-label', `Retirer la photo ${file.name}`);
+    remove.textContent = '×';
+    remove.setAttribute('aria-label', `Supprimer la photo ${file.name}`);
+    remove.title = 'Supprimer cette photo';
     remove.addEventListener('click', () => {
       selectedPhotos.splice(index, 1);
       syncPhotoInput();
       renderPhotoList();
     });
 
-    item.append(name, size, remove);
+    item.append(preview, remove, name);
     list.appendChild(item);
   });
 
