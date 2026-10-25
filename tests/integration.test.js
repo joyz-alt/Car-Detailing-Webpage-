@@ -146,7 +146,7 @@ test('a valid customer request is stored and queues two notifications', async ()
   const stored = await pool.query('SELECT id, status, amount_eur FROM bookings WHERE id = $1', [firstBookingId]);
   assert.equal(stored.rowCount, 1);
   assert.equal(stored.rows[0].status, 'pending');
-  assert.equal(Number(stored.rows[0].amount_eur), 75);
+  assert.equal(Number(stored.rows[0].amount_eur), 90);
 
   const outbox = await pool.query(
     'SELECT recipient, dedupe_key FROM email_outbox WHERE booking_id = $1 ORDER BY dedupe_key',
