@@ -56,8 +56,8 @@ function renderBookings(rs) {
       '</strong> <span class="status status-' + escapeHtml(r.status) + '">' + escapeHtml(labelStatus(r.status)) +
       '</span><br>' + escapeHtml(r.firstName) + ' ' + escapeHtml(r.lastName) + ' · ' + escapeHtml(r.service) +
       ' · ' + escapeHtml(r.vehicle) + '<br><span class="empty">' + escapeHtml(r.phone) + ' · ' + escapeHtml(r.email) +
-      '<br>' + escapeHtml(r.address) + '<br>💧 Eau : <strong>' + escapeHtml(r.water || 'Non renseigné') +
-      '</strong> · ⚡ Électricité : <strong>' + escapeHtml(r.electricity || 'Non renseigné') +
+      '<br>' + escapeHtml(r.address) + '<br>Eau : <strong>' + escapeHtml(r.water || 'Non renseigné') +
+      '</strong> · Électricité : <strong>' + escapeHtml(r.electricity || 'Non renseigné') +
       '</strong><br>État : ' + escapeHtml(r.condition || '') + (r.note ? ' · ' + escapeHtml(r.note) : '') +
       '</span>' + (photos ? '<div class="admin-photo-grid" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px">' + photos + '</div>' :
       ((r.photos || []).length ? '<br><span class="photo-count">Photos enregistrées, mais leur stockage n’est pas disponible.</span>' : '')) +
@@ -74,7 +74,7 @@ $('#bookings').addEventListener('click', async event => {
 
 function labelStatus(s) {
   return {
-    pending: 'À vérifier', awaiting_payment: 'Paiement en attente', confirmed: 'Confirmé', declined: 'Refusé'
+    pending: 'À vérifier', awaiting_payment: 'Paiement en attente', confirmed: 'Confirmé', declined: 'Refusé', expired: 'Paiement expiré'
   }[s] || s;
 }
 

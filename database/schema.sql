@@ -3,7 +3,7 @@ CREATE TABLE IF NOT EXISTS bookings (
   id TEXT PRIMARY KEY,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   service TEXT NOT NULL CHECK (service IN ('Essentiel', 'Intégral')),
-  vehicle TEXT NOT NULL,
+  vehicle TEXT NOT NULL DEFAULT 'Non renseigné',
   booking_date DATE NOT NULL,
   booking_time TIME NOT NULL,
   first_name TEXT NOT NULL,
@@ -19,12 +19,15 @@ CREATE TABLE IF NOT EXISTS bookings (
   duration_minutes INTEGER NOT NULL CHECK (duration_minutes > 0),
   duration_label TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'pending'
-    CHECK (status IN ('pending', 'awaiting_payment', 'confirmed', 'declined')),
+    CHECK (status IN ('pending', 'awaiting_payment', 'confirmed', 'declined', 'expired')),
   stripe_session_id TEXT,
   stripe_payment_intent_id TEXT,
   payment_url TEXT,
   paid_at TIMESTAMPTZ,
-  payment_attempt INTEGER NOT NULL DEFAULT 0 CHECK (payment_attempt >= 0)
+  payment_attempt INTEGER NOT NULL DEFAULT 0 CHECK (payment_attempt >= 0),
+  terms_accepted_at TIMESTAMPTZ,
+  terms_version TEXT,
+  privacy_version TEXT
 );
 CREATE INDEX IF NOT EXISTS bookings_date_status_idx
   ON bookings (booking_date, status);
