@@ -164,3 +164,42 @@ body { font-size: var(--body-size); }
   .photo-list-item small { grid-column: 1; }
   .photo-remove { grid-column: 2; grid-row: 1 / span 2; }
 }
+
+
+/* Refined booking photo picker — compact, premium and mobile-friendly. */
+.photo-upload-field { margin: 16px 0 22px; }
+.photo-upload-field > label { display: block; margin: 0; color: var(--text); font-size: 13px; font-weight: 600; }
+.photo-upload-field input[type="file"] {
+  display: block; width: 100%; margin-top: 10px; padding: 18px 16px;
+  border: 1px dashed #4b535d; border-radius: 5px;
+  background: linear-gradient(145deg, rgba(216,255,69,.045), rgba(255,255,255,.015));
+  color: var(--muted); cursor: pointer;
+  transition: border-color .18s ease, background .18s ease;
+}
+.photo-upload-field input[type="file"]:hover { border-color: var(--accent); background: rgba(216,255,69,.06); }
+.photo-upload-field input[type="file"]::file-selector-button {
+  margin-right: 12px; padding: 9px 12px; border: 1px solid rgba(216,255,69,.45);
+  border-radius: 3px; background: var(--accent); color: #111;
+  font: 700 12px "DM Sans", sans-serif; cursor: pointer;
+}
+.photo-upload-field .form-help { margin: 9px 0 12px; font-size: 11px; line-height: 1.55; }
+.photo-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; padding: 0; margin: 14px 0 0; list-style: none; }
+.photo-list:empty { display: none; }
+.photo-list-item { display: flex; flex-direction: column; align-items: stretch; gap: 8px; min-width: 0; padding: 12px; border: 1px solid var(--line); border-radius: 4px; background: #12161b; }
+.photo-file-name { display: block; min-width: 0; color: var(--text); font-size: 11px; font-weight: 600; overflow-wrap: anywhere; line-height: 1.45; }
+.photo-list-item small { color: var(--muted); font-size: 10px; }
+.photo-remove { align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; padding: 6px 9px; border: 1px solid #3c4149; border-radius: 3px; background: transparent; color: #d5d8dc; cursor: pointer; font: 600 11px "DM Sans", sans-serif; transition: border-color .18s ease, color .18s ease, background .18s ease; }
+.photo-remove::before { content: "×"; font-size: 15px; line-height: .8; }
+.photo-remove:hover { border-color: #a75d5d; color: #ffb2b2; background: rgba(255,100,100,.06); }
+.photo-remove:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.photo-count { margin: 10px 0 0; color: var(--muted); font-size: 11px; }
+.legal-checks { margin: 18px 0; }
+.legal-checks .terms-check { display: flex; align-items: flex-start; gap: 11px; padding: 13px 14px; border: 1px solid var(--line); border-radius: 4px; background: #101418; }
+.legal-checks .terms-check input { flex: 0 0 16px; margin: 3px 0 0; }
+.legal-checks .terms-check span { flex: 1; min-width: 0; }
+@media (max-width: 480px) {
+  .photo-list { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .photo-list-item { padding: 10px; }
+  .photo-upload-field input[type="file"] { padding: 13px 11px; }
+  .photo-upload-field input[type="file"]::file-selector-button { display: block; margin: 0 0 8px; }
+}
