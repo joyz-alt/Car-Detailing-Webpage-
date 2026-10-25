@@ -10,6 +10,7 @@ const { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand } = re
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 
 const app = express();
+app.set('trust proxy', 1);
 const PORT = Number(process.env.PORT || 3000);
 const ADMIN_KEY = process.env.ADMIN_KEY || '';
 if (ADMIN_KEY && ADMIN_KEY.length < 32) {
@@ -101,23 +102,171 @@ function adminGuard(req, res, next) {
   next();
 }
 function publicBaseUrl() { return String(process.env.PUBLIC_URL || 'http://localhost:3000').replace(/\/+$/, ''); }
+
+function getEmailProvider() {
+  if (process.env.RESEND_API_KEY && process.env.MAIL_FROM) return 'resend';
+  if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) return 'smtp';
+  return null;
+}
+function emailSetupReady() {
+  return Boolean(ADMIN_EMAIL && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(ADMIN_EMAIL) && getEmailProvider());
+}
 function getTransporter() {
   if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) return null;
   return nodemailer.createTransport({
     host: process.env.SMTP_HOST,
     port: Number(process.env.SMTP_PORT || 587),
     secure: String(process.env.SMTP_SECURE) === 'true',
-    auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS }
+    auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 15000
   });
 }
-async function sendMail(to, subject, html) {
+
+async function deliverEmail(message) {
+  const provider = getEmailProvider();
+  if (!provider) throw new Error('Email provider is not configured. Set RESEND_API_KEY and MAIL_FROM, or SMTP settings.');
+  if (provider === 'resend') {
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        Authorization: 'Bearer ' + process.env.RESEND_API_KEY,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        from: process.env.MAIL_FROM,
+        to: [message.recipient],
+        subject: message.subject,
+        html: message.htmlBody
+      }),
+      signal: AbortSignal.timeout(15000)
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const detail = result && result.message ? String(result.message).slice(0, 300) : 'HTTP ' + response.status;
+      throw new Error('Resend email request failed: ' + detail);
+    }
+    return;
+  }
+
   const transporter = getTransporter();
-  if (!to || !transporter) { console.warn('[EMAIL] SMTP non configuré.'); return false; }
-  try {
-    await transporter.sendMail({ from: process.env.MAIL_FROM || process.env.SMTP_USER, to, subject, html });
-    return true;
-  } catch (e) { console.error('[EMAIL]', e.message); throw e; }
+  if (!transporter) throw new Error('SMTP settings are incomplete.');
+  await transporter.sendMail({
+    from: process.env.MAIL_FROM || process.env.SMTP_USER,
+    to: message.recipient,
+    subject: message.subject,
+    html: message.htmlBody
+  });
 }
+
+async function enqueueEmail(db, message) {
+  await db.query(
+    'INSERT INTO email_outbox (dedupe_key, booking_id, recipient, subject, html_body) ' +
+    'VALUES ($1, $2, $3, $4, $5) ON CONFLICT (dedupe_key) DO NOTHING',
+    [message.dedupeKey, message.bookingId || null, message.recipient, message.subject, message.htmlBody]
+  );
+}
+
+let emailWorkerRunning = false;
+async function processEmailQueue() {
+  if (emailWorkerRunning) return;
+  emailWorkerRunning = true;
+  try {
+    const client = await pool.connect();
+    let jobs = [];
+    try {
+      await client.query('BEGIN');
+      await client.query(
+        "UPDATE email_outbox SET status = 'pending', locked_at = NULL, next_attempt_at = NOW() " +
+        "WHERE status = 'sending' AND locked_at < NOW() - INTERVAL '10 minutes'"
+      );
+      const selected = await client.query(
+        "SELECT id FROM email_outbox WHERE status = 'pending' AND next_attempt_at <= NOW() " +
+        'ORDER BY created_at ASC LIMIT 10 FOR UPDATE SKIP LOCKED'
+      );
+      const ids = selected.rows.map(row => row.id);
+      if (ids.length) {
+        const claimed = await client.query(
+          "UPDATE email_outbox SET status = 'sending', attempts = attempts + 1, locked_at = NOW() " +
+          'WHERE id = ANY($1::bigint[]) RETURNING id, recipient, subject, html_body AS "htmlBody", attempts',
+          [ids]
+        );
+        jobs = claimed.rows;
+      }
+      await client.query('COMMIT');
+    } catch (e) {
+      await client.query('ROLLBACK').catch(() => {});
+      throw e;
+    } finally {
+      client.release();
+    }
+
+    for (const job of jobs) {
+      try {
+        await deliverEmail(job);
+        await pool.query(
+          "UPDATE email_outbox SET status = 'sent', sent_at = NOW(), locked_at = NULL, last_error = NULL WHERE id = $1",
+          [job.id]
+        );
+      } catch (e) {
+        const status = job.attempts >= 8 ? 'failed' : 'pending';
+        const retryMinutes = Math.min(60, Math.pow(2, Math.max(0, job.attempts - 1)));
+        await pool.query(
+          'UPDATE email_outbox SET status = $2, next_attempt_at = NOW() + ($3 * INTERVAL \'1 minute\'), ' +
+          'locked_at = NULL, last_error = $4 WHERE id = $1',
+          [job.id, status, retryMinutes, String(e.message || e).slice(0, 500)]
+        );
+        console.error('[EMAIL OUTBOX] Message ' + job.id + ' attempt ' + job.attempts + ' failed: ' + String(e.message || e));
+      }
+    }
+  } catch (e) {
+    console.error('[EMAIL WORKER]', e.message || e);
+  } finally {
+    emailWorkerRunning = false;
+  }
+}
+
+async function ensureEmailOutboxSchema() {
+  await pool.query(
+    "CREATE TABLE IF NOT EXISTS email_outbox (" +
+    "id BIGSERIAL PRIMARY KEY, " +
+    "dedupe_key TEXT NOT NULL UNIQUE, " +
+    "booking_id TEXT REFERENCES bookings(id) ON DELETE SET NULL, " +
+    "recipient TEXT NOT NULL, subject TEXT NOT NULL, html_body TEXT NOT NULL, " +
+    "status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'sending', 'sent', 'failed')), " +
+    "attempts INTEGER NOT NULL DEFAULT 0 CHECK (attempts >= 0), " +
+    "next_attempt_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), locked_at TIMESTAMPTZ, " +
+    "last_error TEXT, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), sent_at TIMESTAMPTZ)"
+  );
+  await pool.query(
+    'CREATE INDEX IF NOT EXISTS email_outbox_pending_idx ON email_outbox (status, next_attempt_at, created_at)'
+  );
+}
+
+function createRateLimiter(windowMs, maxRequests) {
+  const entries = new Map();
+  return (req, res, next) => {
+    const now = Date.now();
+    const key = req.ip || req.socket.remoteAddress || 'unknown';
+    let entry = entries.get(key);
+    if (!entry || entry.resetAt <= now) {
+      entry = { count: 0, resetAt: now + windowMs };
+      entries.set(key, entry);
+    }
+    entry.count += 1;
+    if (entries.size > 5000) {
+      for (const [ip, item] of entries) if (item.resetAt <= now) entries.delete(ip);
+    }
+    if (entry.count > maxRequests) {
+      res.set('Retry-After', String(Math.max(1, Math.ceil((entry.resetAt - now) / 1000))));
+      return res.status(429).json({ error: 'Trop de demandes. Réessayez un peu plus tard.' });
+    }
+    next();
+  };
+}
+const bookingRateLimit = createRateLimiter(60 * 60 * 1000, 8);
+const availabilityRateLimit = createRateLimiter(60 * 1000, 90);
 function detectImageType(buffer) {
   if (buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) {
     return { mime: 'image/jpeg' };
@@ -216,7 +365,7 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
       const booking = session.metadata && session.metadata.bookingId
         ? await getBooking(client, session.metadata.bookingId, true) : null;
 
-      if (booking && session.payment_status === 'paid') {
+      if (booking && session.payment_status === 'paid' && booking.stripeSessionId === session.id) {
         if (session.currency !== 'eur' || Number(session.amount_total) !== Number(booking.amount) * 100) {
           throw new Error('Le montant ou la devise Stripe ne correspond pas à la réservation.');
         }
@@ -227,7 +376,18 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
             'WHERE id = $1 AND status <> \'declined\' RETURNING id',
             [booking.id, typeof session.payment_intent === 'string' ? session.payment_intent : null]
           );
-          if (updated.rowCount && booking.status !== 'confirmed') confirmation = booking;
+          if (updated.rowCount && booking.status !== 'confirmed') {
+            confirmation = booking;
+            await enqueueEmail(client, {
+              dedupeKey: 'booking:' + booking.id + ':confirmed',
+              bookingId: booking.id,
+              recipient: booking.email,
+              subject: 'Épure Auto — rendez-vous confirmé',
+              htmlBody: '<p>Bonjour ' + escapeHtml(booking.firstName) + ',</p><p>Votre rendez-vous est confirmé pour le <strong>' +
+                escapeHtml(booking.date) + '</strong> à <strong>' + escapeHtml(booking.time) + '</strong>.</p><p>Prestation : ' +
+                escapeHtml(booking.service) + ' · ' + escapeHtml(booking.amount) + ' €</p><p>À bientôt,<br>Épure Auto</p>'
+            });
+          }
         }
       }
     }
@@ -251,13 +411,7 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
     return res.status(400).send('Le webhook n’a pas pu être traité.');
   } finally { client.release(); }
 
-  if (confirmation) {
-    await sendMail(confirmation.email, 'Épure Auto — rendez-vous confirmé',
-      '<p>Bonjour ' + escapeHtml(confirmation.firstName) + ',</p><p>Votre rendez-vous est confirmé pour le <strong>' +
-      escapeHtml(confirmation.date) + '</strong> à <strong>' + escapeHtml(confirmation.time) + '</strong>.</p><p>Prestation : ' +
-      escapeHtml(confirmation.service) + ' · ' + escapeHtml(confirmation.amount) + ' €</p><p>À bientôt,<br>Épure Auto</p>')
-      .catch(e => console.error('[EMAIL CONFIRMATION]', e.message));
-  }
+  if (confirmation) void processEmailQueue().catch(e => console.error('[EMAIL CONFIRMATION QUEUE]', e.message));
   res.json({ received: true });
 }));
 
@@ -279,11 +433,18 @@ app.get('/api/config', (req, res) => res.json({
   stripeEnabled: Boolean(stripe), services: SERVICES, slots: SLOTS,
   maxPhotos: MAX_PHOTOS, maxPhotoBytes: MAX_PHOTO_BYTES
 }));
-app.get('/api/email-status', (req, res) => res.json({
-  configured: Boolean(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS)
+app.get('/api/email-status', adminGuard, asyncHandler(async (req, res) => {
+  const counts = await pool.query(
+    'SELECT status, COUNT(*)::int AS count FROM email_outbox GROUP BY status'
+  );
+  res.json({
+    configured: emailSetupReady(),
+    provider: getEmailProvider() || 'none',
+    queue: Object.fromEntries(counts.rows.map(row => [row.status, row.count]))
+  });
 }));
 
-app.get('/api/availability', asyncHandler(async (req, res) => {
+app.get('/api/availability', availabilityRateLimit, asyncHandler(async (req, res) => {
   const date = text(req.query.date, 10);
   const service = text(req.query.service || 'Essentiel', 30);
   if (!isValidDate(date)) return res.status(400).json({ error: 'Date invalide.' });
@@ -314,7 +475,14 @@ app.get('/api/availability', asyncHandler(async (req, res) => {
   } finally { client.release(); }
 }));
 
-app.post('/api/bookings', upload.array('photos', MAX_PHOTOS), asyncHandler(async (req, res) => {
+app.post('/api/bookings', bookingRateLimit, (req, res, next) => {
+  if (!emailSetupReady()) {
+    return res.status(503).json({
+      error: 'La réservation en ligne est temporairement indisponible. Le service e-mail doit être configuré avant de recevoir les demandes.'
+    });
+  }
+  next();
+}, upload.array('photos', MAX_PHOTOS), asyncHandler(async (req, res) => {
   const body = req.body || {};
   const service = text(body.service, 30);
   const vehicle = text(body.vehicle, 100);
@@ -380,6 +548,29 @@ app.post('/api/bookings', upload.array('photos', MAX_PHOTOS), asyncHandler(async
         [id, p.objectKey, p.originalName, p.contentType, p.sizeBytes]
       );
     }
+
+    await enqueueEmail(client, {
+      dedupeKey: 'booking:' + id + ':new-request-owner',
+      bookingId: id,
+      recipient: ADMIN_EMAIL,
+      subject: 'Épure Auto — nouvelle demande ' + id,
+      htmlBody: '<h2>Nouvelle demande de réservation</h2><p><strong>' + escapeHtml(firstName) + ' ' + escapeHtml(lastName) +
+        '</strong><br>' + escapeHtml(phone) + '<br>' + escapeHtml(email) + '</p><p><strong>' + escapeHtml(service) +
+        '</strong> · ' + escapeHtml(vehicle) + '<br>' + escapeHtml(date) + ' à ' + escapeHtml(time) + '<br>' +
+        escapeHtml(address) + '</p><p>💧 Eau : <strong>' + escapeHtml(water) + '</strong><br>⚡ Électricité : <strong>' +
+        escapeHtml(electricity) + '</strong><br>État : <strong>' + escapeHtml(condition) + '</strong></p><p>Photos : ' +
+        photos.length + '</p>' + (note ? '<p>Note : ' + escapeHtml(note) + '</p>' : '') +
+        '<p><a href="' + escapeHtml(publicBaseUrl()) + '/admin.html">Ouvrir l’espace pro</a></p>'
+    });
+    await enqueueEmail(client, {
+      dedupeKey: 'booking:' + id + ':request-received-customer',
+      bookingId: id,
+      recipient: email,
+      subject: 'Épure Auto — demande de réservation reçue',
+      htmlBody: '<p>Bonjour ' + escapeHtml(firstName) + ',</p><p>Nous avons bien reçu votre demande pour la prestation <strong>' +
+        escapeHtml(service) + '</strong> le <strong>' + escapeHtml(date) + '</strong> à <strong>' + escapeHtml(time) +
+        '</strong>.</p><p>Votre demande n’est pas encore confirmée. Nous vérifions les informations et le créneau, puis nous vous enverrons un lien de paiement si la réservation est acceptée.</p><p>À bientôt,<br>Épure Auto</p>'
+    });
     await client.query('COMMIT');
   } catch (e) {
     await client.query('ROLLBACK').catch(() => {});
@@ -387,21 +578,24 @@ app.post('/api/bookings', upload.array('photos', MAX_PHOTOS), asyncHandler(async
     throw e;
   } finally { client.release(); }
 
-  await sendMail(process.env.ADMIN_EMAIL || 'epureauto@gmail.com', 'Épure Auto — nouvelle demande ' + id,
-    '<h2>Nouvelle demande de réservation</h2><p><strong>' + escapeHtml(firstName) + ' ' + escapeHtml(lastName) +
-    '</strong><br>' + escapeHtml(phone) + '<br>' + escapeHtml(email) + '</p><p><strong>' + escapeHtml(service) +
-    '</strong> · ' + escapeHtml(vehicle) + '<br>' + escapeHtml(date) + ' à ' + escapeHtml(time) + '<br>' +
-    escapeHtml(address) + '</p><p>💧 Eau : <strong>' + escapeHtml(water) + '</strong><br>⚡ Électricité : <strong>' +
-    escapeHtml(electricity) + '</strong><br>État : <strong>' + escapeHtml(condition) + '</strong></p><p>Photos : ' +
-    photos.length + '</p>' + (note ? '<p>Note : ' + escapeHtml(note) + '</p>' : '') +
-    '<p><a href="' + escapeHtml(publicBaseUrl()) + '/admin.html">Ouvrir l’espace pro</a></p>')
-    .catch(e => console.error('[EMAIL NOUVELLE DEMANDE]', e.message));
+  void processEmailQueue().catch(e => console.error('[EMAIL BOOKING QUEUE]', e.message));
+
+
 
   res.status(201).json({
     booking: { id, service, vehicle, date, time, firstName, lastName, amount: SERVICES[service].amount, status: 'pending',
       photos: photos.map(p => ({ name: p.originalName, type: p.contentType })) },
     message: 'Demande envoyée. Votre créneau sera confirmé après vérification.'
   });
+}));
+
+app.get('/api/admin/email-outbox', adminGuard, asyncHandler(async (req, res) => {
+  const result = await pool.query(
+    'SELECT id, booking_id AS "bookingId", recipient, subject, status, attempts, next_attempt_at AS "nextAttemptAt", ' +
+    'last_error AS "lastError", created_at AS "createdAt", sent_at AS "sentAt" ' +
+    'FROM email_outbox ORDER BY created_at DESC LIMIT 30'
+  );
+  res.json({ configured: emailSetupReady(), provider: getEmailProvider() || 'none', messages: result.rows });
 }));
 
 app.get('/api/admin/bookings', adminGuard, asyncHandler(async (req, res) => {
@@ -435,14 +629,21 @@ app.post('/api/admin/bookings/:id/decline', adminGuard, asyncHandler(async (req,
     [req.params.id]
   );
   if (!changed.rowCount) return res.status(409).json({ error: 'Le statut a changé. Actualisez la page.' });
-  await sendMail(booking.email, 'Épure Auto — demande ' + booking.id,
-    '<p>Bonjour ' + escapeHtml(booking.firstName) + ',</p><p>Nous sommes désolés, le créneau demandé n’est finalement pas disponible. Nous reviendrons vers vous pour proposer un autre créneau.</p>')
-    .catch(e => console.error('[EMAIL REFUS]', e.message));
+  await enqueueEmail(pool, {
+    dedupeKey: 'booking:' + booking.id + ':declined',
+    bookingId: booking.id,
+    recipient: booking.email,
+    subject: 'Épure Auto — demande ' + booking.id,
+    htmlBody: '<p>Bonjour ' + escapeHtml(booking.firstName) + ',</p><p>Nous sommes désolés, le créneau demandé n’est finalement pas disponible. Nous reviendrons vers vous pour proposer un autre créneau.</p>'
+  });
+  void processEmailQueue().catch(e => console.error('[EMAIL REFUS QUEUE]', e.message));
   res.json({ ok: true });
 }));
 
 app.post('/api/admin/bookings/:id/payment', adminGuard, asyncHandler(async (req, res) => {
-  if (!stripe) return res.status(503).json({ error: 'Stripe n’est pas configuré. Ajoutez STRIPE_SECRET_KEY.' });
+  if (!stripe || !process.env.STRIPE_WEBHOOK_SECRET) {
+    return res.status(503).json({ error: 'Stripe ou son webhook n’est pas configuré. Aucun lien de paiement n’a été créé.' });
+  }
   const client = await pool.connect();
   let booking, session;
   try {
@@ -472,23 +673,34 @@ app.post('/api/admin/bookings/:id/payment', adminGuard, asyncHandler(async (req,
       expires_at: Math.floor(Date.now() / 1000) + 30 * 60
     });
 
+    if (!session.url) throw new Error('Stripe did not return a Checkout URL.');
     await client.query(
       'UPDATE bookings SET status = \'awaiting_payment\', stripe_session_id = $2, payment_url = $3 WHERE id = $1',
       [booking.id, session.id, session.url]
     );
+    await enqueueEmail(client, {
+      dedupeKey: 'booking:' + booking.id + ':payment:' + session.id,
+      bookingId: booking.id,
+      recipient: booking.email,
+      subject: 'Épure Auto — votre réservation est prête à être confirmée',
+      htmlBody: '<p>Bonjour ' + escapeHtml(booking.firstName) + ',</p><p>Votre créneau du <strong>' + escapeHtml(booking.date) +
+        '</strong> à <strong>' + escapeHtml(booking.time) + '</strong> est disponible.</p><p>Montant : <strong>' +
+        escapeHtml(booking.amount) + ' €</strong></p><p><a href="' + escapeHtml(session.url) +
+        '">Payer et confirmer mon rendez-vous</a></p><p>Le lien expire dans 30 minutes.</p>'
+    });
     await client.query('COMMIT');
   } catch (e) {
     await client.query('ROLLBACK').catch(() => {});
     throw e;
   } finally { client.release(); }
 
-  const emailSent = await sendMail(booking.email, 'Épure Auto — votre réservation est prête à être confirmée',
-    '<p>Bonjour ' + escapeHtml(booking.firstName) + ',</p><p>Votre créneau du <strong>' + escapeHtml(booking.date) +
-    '</strong> à <strong>' + escapeHtml(booking.time) + '</strong> est disponible.</p><p>Montant : <strong>' +
-    escapeHtml(booking.amount) + ' €</strong></p><p><a href="' + escapeHtml(session.url) +
-    '">Payer et confirmer mon rendez-vous</a></p><p>Le lien expire dans 30 minutes.</p>')
-    .catch(e => { console.error('[EMAIL PAIEMENT]', e.message); return false; });
-  res.json({ ok: true, paymentUrl: session.url, emailSent });
+  await processEmailQueue();
+  const emailResult = await pool.query(
+    'SELECT status FROM email_outbox WHERE dedupe_key = $1',
+    ['booking:' + booking.id + ':payment:' + session.id]
+  );
+  const emailStatus = emailResult.rows[0] ? emailResult.rows[0].status : 'pending';
+  res.json({ ok: true, paymentUrl: session.url, emailSent: emailStatus === 'sent', emailStatus });
 }));
 
 app.use((error, req, res, next) => {
@@ -506,9 +718,17 @@ app.use((error, req, res, next) => {
 async function start() {
   try {
     await pool.query('SELECT 1');
-    app.listen(PORT, '0.0.0.0', () => console.log('Épure Auto server listening on port ' + PORT));
+    await ensureEmailOutboxSchema();
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log('Épure Auto server listening on port ' + PORT);
+      void processEmailQueue().catch(e => console.error('[EMAIL WORKER START]', e.message));
+    });
+    const emailWorkerTimer = setInterval(() => {
+      void processEmailQueue().catch(e => console.error('[EMAIL WORKER TIMER]', e.message));
+    }, 30000);
+    emailWorkerTimer.unref();
   } catch (e) {
-    console.error('Impossible de se connecter à PostgreSQL :', e.message);
+    console.error('Impossible de préparer PostgreSQL :', e.message);
     process.exit(1);
   }
 }
