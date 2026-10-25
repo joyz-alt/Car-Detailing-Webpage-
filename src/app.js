@@ -32,8 +32,8 @@ function validateStep(step) {
   }
   if (step === 2 && !$('#time').value) return alert('Choisissez un créneau.'), false;
   if (step === 3) {
-    if (!$('#legalAccepted').checked || !$('#privacyAcknowledged').checked) {
-      alert('Merci d’accepter les CGV et de confirmer avoir pris connaissance de la politique de confidentialité.');
+    if (!$('#legalAccepted').checked) {
+      alert('Merci d’accepter les CGV et de prendre connaissance de la politique de confidentialité.');
       return false;
     }
     try { validatePhotoFiles($('#photos').files); }
@@ -150,7 +150,6 @@ async function submitBooking(e) {
       email: $('#email').value.trim(),
       address: [$('#streetAddress').value.trim(), $('#postcode').value.trim(), $('#city').value.trim()].join(', '),
       legalAccepted: $('#legalAccepted').checked ? 'true' : 'false',
-      privacyAcknowledged: $('#privacyAcknowledged').checked ? 'true' : 'false',
       earlyExecutionRequested: $('#earlyExecutionRequested')?.checked ? 'true' : 'false',
       note: $('#note').value.trim()
     };
