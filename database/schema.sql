@@ -23,7 +23,8 @@ CREATE TABLE IF NOT EXISTS bookings (
   stripe_session_id TEXT,
   stripe_payment_intent_id TEXT,
   payment_url TEXT,
-  paid_at TIMESTAMPTZ
+  paid_at TIMESTAMPTZ,
+  payment_attempt INTEGER NOT NULL DEFAULT 0 CHECK (payment_attempt >= 0)
 );
 CREATE INDEX IF NOT EXISTS bookings_date_status_idx
   ON bookings (booking_date, status);
