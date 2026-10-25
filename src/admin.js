@@ -44,7 +44,7 @@ function renderBookings(rs) {
       '<img src="' + escapeHtml(p.url) + '" alt="Photo du véhicule" loading="lazy" ' +
       'style="width:94px;height:70px;object-fit:cover;border-radius:8px;border:1px solid var(--border)"></a>'
     ).join('');
-    const canCreatePayment = ['pending', 'expired'].includes(r.status);
+    const canRecordPayment = r.status === 'pending';
     const serviceOptions = ['Essentiel', 'Intégral'].map(service =>
       '<option value="' + service + '"' + (r.service === service ? ' selected' : '') + '>' +
       service + ' — ' + (service === 'Essentiel' ? '90' : '130') + ' €</option>'
@@ -52,21 +52,23 @@ function renderBookings(rs) {
     const savedAddons = Array.isArray(r.paymentItems)
       ? r.paymentItems.slice(1).map(item => item.name + ' | ' + item.amount).join('\n')
       : '';
-    const paymentForm = canCreatePayment
-      ? '<div class="payment-config" style="display:grid;gap:8px;min-width:min(100%,280px);margin-top:12px">' +
+    const paymentForm = canRecordPayment
+      ? '<div class="payment-config">' +
         '<label>Formule finale<select data-field="service">' + serviceOptions + '</select></label>' +
         '<label>Suppléments (une ligne par extra : intitulé | prix en €)' +
         '<textarea data-field="addons" rows="3" placeholder="Poils d’animaux | 20&#10;Traitement des taches | 15">' +
         escapeHtml(savedAddons) + '</textarea></label>' +
-        '<small class="empty">À utiliser après le nettoyage, lorsque le montant final a été convenu avec le client.</small>' +
-        '<button class="btn btn-primary btn-small" data-action="payment" data-id="' + escapeHtml(r.id) + '">' +
-        (r.status === 'expired' ? 'Renvoyer le lien de paiement' : 'Créer et envoyer le lien après nettoyage') + '</button>' +
-        (r.status === 'pending' ? '<button class="btn btn-secondary btn-small" data-action="decline" data-id="' + escapeHtml(r.id) + '">Refuser la demande</button>' : '') +
-        '</div>'
+        '<label>Mode de règlement<select data-field="paymentMethod"><option value="card">Carte bancaire (terminal / application)</option><option value="cash">Espèces</option></select></label>' +
+        '<small class="empty">Enregistrez uniquement après le nettoyage et après avoir réellement reçu le règlement. Le client doit avoir accepté la formule et chaque supplément.</small>' +
+        '<button class="btn btn-primary btn-small" data-action="payment" data-id="' + escapeHtml(r.id) + '">Enregistrer le paiement reçu et envoyer le reçu</button>' +
+        '<button class="btn btn-secondary btn-small" data-action="decline" data-id="' + escapeHtml(r.id) + '">Refuser la demande</button></div>'
       : '';
-    const paymentLink = r.paymentUrl && r.status === 'awaiting_payment'
-      ? '<a class="btn btn-secondary btn-small" href="' + escapeHtml(r.paymentUrl) + '" target="_blank" rel="noopener noreferrer">Ouvrir le lien de paiement</a>'
-      : '';
+    const receiptDetails = r.status === 'confirmed'
+      ? '<div class="payment-receipt"><strong>Règlement enregistré : ' + escapeHtml(r.amount) + ' €</strong><br>Mode : ' +
+        escapeHtml(r.paymentMethod === 'card' ? 'Carte bancaire' : r.paymentMethod === 'cash' ? 'Espèces' : 'Non renseigné') +
+        (Array.isArray(r.paymentItems) && r.paymentItems.length
+          ? '<ul>' + r.paymentItems.map(item => '<li>' + escapeHtml(item.name) + ' : ' + escapeHtml(item.amount) + ' €</li>').join('') + '</ul>' : '') +
+        '</div>' : '';
 
     return '<li class="booking-admin-item"><div><strong>' + escapeHtml(r.date) + ' · ' + escapeHtml(r.time) +
       '</strong> <span class="status status-' + escapeHtml(r.status) + '">' + escapeHtml(labelStatus(r.status)) +
@@ -78,7 +80,7 @@ function renderBookings(rs) {
       '</strong><br>État : ' + escapeHtml(r.condition || '') + (r.note ? ' · ' + escapeHtml(r.note) : '') +
       '</span>' + (photos ? '<div class="admin-photo-grid" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px">' + photos + '</div>' :
       ((r.photos || []).length ? '<br><span class="photo-count">Photos enregistrées, mais leur stockage n’est pas disponible.</span>' : '')) +
-      (paymentForm ? paymentForm : '') + '</div><div class="admin-actions">' + paymentLink + '</div></li>';
+      receiptDetails + paymentForm + '</div></li>';
   }).join('');
 }
 $('#bookings').addEventListener('click', async event => {
@@ -90,9 +92,7 @@ $('#bookings').addEventListener('click', async event => {
 });
 
 function labelStatus(s) {
-  return {
-    pending: 'Réservation reçue', awaiting_payment: 'Paiement en attente', confirmed: 'Payé', declined: 'Refusé', expired: 'Lien expiré'
-  }[s] || s;
+  return { pending: 'Réservation reçue', confirmed: 'Payé', declined: 'Refusé' }[s] || s;
 }
 
 async function render() {
@@ -183,6 +183,7 @@ async function sendPayment(id, button) {
   const card = button.closest('.booking-admin-item');
   const service = card?.querySelector('[data-field="service"]')?.value;
   const addonText = card?.querySelector('[data-field="addons"]')?.value || '';
+  const paymentMethod = card?.querySelector('[data-field="paymentMethod"]')?.value;
   const addons = [];
   for (const line of addonText.split(/\r?\n/).map(value => value.trim()).filter(Boolean)) {
     const separator = line.lastIndexOf('|');
@@ -192,25 +193,19 @@ async function sendPayment(id, button) {
     if (!name || !/^\d+$/.test(amountText)) return alert('Chaque supplément doit avoir un intitulé et un prix entier en euros. Exemple : Poils d’animaux | 20');
     addons.push({ name, amount: Number(amountText) });
   }
-  if (!confirm('Confirmez-vous que le nettoyage est terminé et que le client a accepté le montant final ? Un lien Stripe sera créé et envoyé par e-mail.')) return;
+  const methodLabel = paymentMethod === 'card' ? 'carte bancaire' : 'espèces';
+  if (!confirm('Confirmez-vous que le nettoyage est terminé, que le client a accepté la formule et tous les suppléments, et que le règlement par ' + methodLabel + ' a réellement été reçu ? Cette action marque la réservation comme payée et envoie un reçu par e-mail.')) return;
   button.disabled = true;
   try {
     const d = await api(`/api/admin/bookings/${id}/payment`, {
       method: 'POST',
-      body: JSON.stringify({ service, addons })
+      body: JSON.stringify({ service, addons, paymentMethod, customerAgreed: true })
     });
-    if (d.emailSent) {
-      alert('Le lien de paiement de ' + d.totalAmount + ' € a été envoyé au client par e-mail.');
-    } else if (d.emailStatus === 'failed') {
-      alert('Le lien Stripe de ' + d.totalAmount + ' € a été créé, mais l’e-mail a échoué. Consultez « Notifications e-mail ».');
-    } else {
-      alert('Le lien de paiement de ' + d.totalAmount + ' € est créé. L’e-mail est en cours de traitement ; vérifiez « Notifications e-mail ».');
-    }
+    if (d.emailSent) alert('Paiement de ' + d.totalAmount + ' € enregistré. Le reçu a été envoyé au client.');
+    else if (d.emailStatus === 'failed') alert('Paiement de ' + d.totalAmount + ' € enregistré, mais le reçu n’a pas été envoyé. Consultez « Notifications e-mail » et réessayez.');
+    else alert('Paiement de ' + d.totalAmount + ' € enregistré. L’envoi du reçu est en cours ; vérifiez « Notifications e-mail ».');
     render();
-  } catch (e) {
-    alert(e.message);
-    button.disabled = false;
-  }
+  } catch (e) { alert(e.message); button.disabled = false; }
 }
 async function decline(id) {
   if (!confirm('Refuser cette demande ?'))
