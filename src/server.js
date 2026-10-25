@@ -586,7 +586,6 @@ app.post('/api/bookings', bookingRateLimit, (req, res, next) => {
   const id = makeId();
   const photos = [];
   const client = await pool.connect();
-  let paymentSession = null;
   try {
     for (const item of checkedFiles) photos.push(await uploadPhoto(id, item.file, item.detected));
 
@@ -612,28 +611,6 @@ app.post('/api/bookings', bookingRateLimit, (req, res, next) => {
       );
     }
 
-    if (stripe && process.env.STRIPE_WEBHOOK_SECRET) {
-      paymentSession = await stripe.checkout.sessions.create({
-        mode: 'payment',
-        customer_email: email,
-        payment_method_types: ['card'],
-        line_items: [{ price_data: {
-          currency: 'eur',
-          product_data: { name: 'Épure Auto — ' + service, description: date + ' à ' + time },
-          unit_amount: SERVICES[service].amount * 100
-        }, quantity: 1 }],
-        metadata: { bookingId: id },
-        success_url: publicBaseUrl() + '/success.html?booking=' + encodeURIComponent(id),
-        cancel_url: publicBaseUrl() + '/reservation-annulee.html?booking=' + encodeURIComponent(id),
-        expires_at: Math.floor(Date.now() / 1000) + 35 * 60
-      }, { idempotencyKey: 'epure-booking-' + id + '-payment-1' });
-      if (!paymentSession.url) throw new Error('Stripe did not return a Checkout URL.');
-      await client.query(
-        "UPDATE bookings SET status = 'awaiting_payment', stripe_session_id = $2, payment_url = $3 WHERE id = $1",
-        [id, paymentSession.id, paymentSession.url]
-      );
-    }
-
     await enqueueEmail(client, {
       dedupeKey: 'booking:' + id + ':new-request-owner',
       bookingId: id,
@@ -651,10 +628,8 @@ app.post('/api/bookings', bookingRateLimit, (req, res, next) => {
       dedupeKey: 'booking:' + id + ':request-received-customer',
       bookingId: id,
       recipient: email,
-      subject: paymentSession ? 'Épure Auto — finalisez votre réservation' : 'Épure Auto — demande de réservation reçue',
-      htmlBody: paymentSession
-        ? '<p>Bonjour ' + escapeHtml(firstName) + ',</p><p>Votre réservation a été enregistrée pour <strong>' + escapeHtml(service) + '</strong>, le <strong>' + escapeHtml(date) + '</strong> à <strong>' + escapeHtml(time) + '</strong>.</p><p>Pour confirmer le rendez-vous, effectuez le paiement sécurisé : <a href="' + escapeHtml(paymentSession.url) + '">payer et confirmer mon rendez-vous</a>. Ce lien expire dans 35 minutes.</p><p>Si vous ne voyez pas cet e-mail dans votre boîte de réception, vérifiez vos courriers indésirables (spam).</p><p>À bientôt,<br>Épure Auto</p>'
-        : '<p>Bonjour ' + escapeHtml(firstName) + ',</p><p>Nous avons bien reçu votre demande pour la prestation <strong>' + escapeHtml(service) + '</strong> le <strong>' + escapeHtml(date) + '</strong> à <strong>' + escapeHtml(time) + '</strong>.</p><p>La demande attend une validation manuelle car le paiement en ligne n’est pas disponible. Nous vous recontacterons après vérification.</p><p>Si vous ne voyez pas cet e-mail dans votre boîte de réception, vérifiez vos courriers indésirables (spam).</p><p>À bientôt,<br>Épure Auto</p>'
+      subject: 'Épure Auto — demande de réservation reçue',
+      htmlBody: '<p>Bonjour ' + escapeHtml(firstName) + ',</p><p>Nous avons bien reçu votre demande pour la prestation <strong>' + escapeHtml(service) + '</strong> le <strong>' + escapeHtml(date) + '</strong> à <strong>' + escapeHtml(time) + '</strong>.</p><p>Nous vous recontacterons pour confirmer les détails du rendez-vous. Aucun paiement n’est demandé sur le site : le règlement aura lieu après le nettoyage, une fois le montant final convenu.</p><p>Si vous ne voyez pas cet e-mail dans votre boîte de réception, vérifiez vos courriers indésirables (spam).</p><p>À bientôt,<br>Épure Auto</p>'
     });
     await client.query('COMMIT');
   } catch (e) {
@@ -668,9 +643,9 @@ app.post('/api/bookings', bookingRateLimit, (req, res, next) => {
 
 
   res.status(201).json({
-    booking: { id, service, vehicle, date, time, firstName, lastName, amount: SERVICES[service].amount, status: paymentSession ? 'awaiting_payment' : 'pending', paymentUrl: paymentSession ? paymentSession.url : null,
+    booking: { id, service, vehicle, date, time, firstName, lastName, amount: SERVICES[service].amount, status: 'pending', paymentUrl: null,
       photos: photos.map(p => ({ name: p.originalName, type: p.contentType })) },
-    message: paymentSession ? 'Réservation enregistrée. Le paiement sécurisé permettra de confirmer votre rendez-vous.' : 'Demande envoyée. La réservation attend une validation manuelle car le paiement en ligne n’est pas disponible.'
+    message: 'Demande enregistrée. Aucun paiement n’est demandé en ligne ; le règlement aura lieu après la prestation.'
   });
 }));
 
