@@ -44,6 +44,14 @@
         </div>
         <ul class="admin-list" id="bookings"></ul>
       </section>
+      <section class="admin-card" style="grid-column:1/-1">
+        <div style="display:flex;justify-content:space-between;gap:15px;align-items:center">
+          <h3>Notifications e-mail</h3>
+          <button class="btn btn-secondary" id="refreshEmails">Actualiser</button>
+        </div>
+        <p class="empty" id="emailProvider">Vérification de la configuration…</p>
+        <ul class="admin-list" id="emailOutbox"></ul>
+      </section>
     </div>
   </main>
   <script src="admin.js"></script>
