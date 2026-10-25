@@ -32,7 +32,9 @@
 2. Copy `.env.example` to `.env` and fill in your own credentials.
 3. Run `npm install`, then `npm start`.
 4. Open `http://localhost:3000/health` and verify it returns `{"ok":true}`.
-5. Check `/api/config`. The email status endpoint is admin-protected: call `/api/email-status` with the `x-admin-key` header.
+5. Run `npm run check` for JavaScript syntax checks.
+6. Integration tests require a **dedicated disposable test database**: set `TEST_DATABASE_URL` to that database, initialise it with `database/schema.sql`, then run `npm test`. The tests clear tables in that database; never point `TEST_DATABASE_URL` at production.
+7. Check `/api/config`. The email status endpoint is admin-protected: call `/api/email-status` with the `x-admin-key` header.
 
 ## Render deployment
 - Root directory: blank (the `package.json` is at repository root).
@@ -50,7 +52,7 @@
 - Payment request: confirming an appointment in admin queues a Stripe Checkout link.
 - Payment success: only a valid, matching Stripe webhook queues the customer confirmation email.
 - Decline: the customer receives a decline message.
-- Transient email errors are retried automatically with backoff. After repeated failures, the message is marked failed; the admin dashboard lists the provider error and offers a manual retry.
+- Transient email errors are retried automatically with backoff. After repeated failures, the message is marked failed; the admin dashboard lists the provider error and offers a manual retry. Sent queue bodies are purged after 30 days; failed queue entries are purged after 90 days.
 - The admin outbox displays delivery state; do not assume email was delivered merely because a booking was stored.
 
 ## Before real customers
