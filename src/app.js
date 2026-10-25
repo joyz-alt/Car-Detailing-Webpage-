@@ -116,7 +116,7 @@ function renderSummary() {
   const amount = serviceData[s]?.amount ?? 0;
   const duration = serviceData[s]?.duration ?? '';
 
-  $('#summary').textContent = `${s} · ${new Date(d + 'T12:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })} à ${t} · ${amount} € · durée estimée ${duration}`;
+  $('#summary').textContent = `${s} · ${new Date(d + 'T12:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })} à ${t} · prix de base ${amount} € · durée estimée ${duration} · paiement après la prestation`;
 }
 
 let selectedPhotos = [];
