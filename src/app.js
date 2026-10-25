@@ -119,6 +119,8 @@ function renderSummary() {
   $('#summary').textContent = `${s} · ${new Date(d + 'T12:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })} à ${t} · ${amount} € · durée estimée ${duration}`;
 }
 
+let selectedPhotos = [];
+
 function validatePhotoFiles(fileList) {
   const files = [...fileList];
   if (files.length > 5) throw new Error('Vous pouvez ajouter 5 photos maximum.');
@@ -130,6 +132,87 @@ function validatePhotoFiles(fileList) {
       throw new Error('Chaque photo doit faire 5 Mo maximum.');
     }
   }
+}
+
+function syncPhotoInput() {
+  const input = $('#photos');
+  if (!input) return;
+  const transfer = new DataTransfer();
+  selectedPhotos.forEach(file => transfer.items.add(file));
+  input.files = transfer.files;
+}
+
+function renderPhotoList() {
+  const list = $('#photoList');
+  const count = $('#photoCount');
+  if (!list || !count) return;
+
+  list.replaceChildren();
+  selectedPhotos.forEach((file, index) => {
+    const item = document.createElement('li');
+    item.className = 'photo-list-item';
+
+    const name = document.createElement('span');
+    name.className = 'photo-file-name';
+    name.textContent = file.name;
+
+    const size = document.createElement('small');
+    size.textContent = `${(file.size / (1024 * 1024)).toFixed(2)} Mo`;
+
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'photo-remove';
+    remove.textContent = 'Retirer';
+    remove.setAttribute('aria-label', `Retirer la photo ${file.name}`);
+    remove.addEventListener('click', () => {
+      selectedPhotos.splice(index, 1);
+      syncPhotoInput();
+      renderPhotoList();
+    });
+
+    item.append(name, size, remove);
+    list.appendChild(item);
+  });
+
+  count.textContent = selectedPhotos.length === 0
+    ? 'Aucune photo sélectionnée.'
+    : `${selectedPhotos.length} photo${selectedPhotos.length > 1 ? 's' : ''} sur 5 sélectionnée${selectedPhotos.length > 1 ? 's' : ''}.`;
+}
+
+function handlePhotoSelection(event) {
+  const input = event.currentTarget;
+  const incoming = [...input.files];
+  input.value = '';
+
+  if (!incoming.length) return;
+
+  const combined = [...selectedPhotos];
+  for (const file of incoming) {
+    const duplicate = combined.some(existing =>
+      existing.name === file.name &&
+      existing.size === file.size &&
+      existing.lastModified === file.lastModified
+    );
+    if (!duplicate) combined.push(file);
+  }
+
+  if (combined.length > 5) {
+    syncPhotoInput();
+    alert('Vous pouvez sélectionner 5 photos maximum au total. Les photos déjà sélectionnées ont été conservées.');
+    return;
+  }
+
+  try {
+    validatePhotoFiles(combined);
+  } catch (err) {
+    syncPhotoInput();
+    alert(err.message);
+    return;
+  }
+
+  selectedPhotos = combined;
+  syncPhotoInput();
+  renderPhotoList();
 }
 
 async function submitBooking(e) {
@@ -196,6 +279,8 @@ function init() {
 
   $('#service')?.addEventListener('change', loadSlots);
   $('#date')?.addEventListener('change', () => { loadSlots(); updateEarlyExecutionConsent(); });
+  $('#photos')?.addEventListener('change', handlePhotoSelection);
+  renderPhotoList();
   $$('.next-btn').forEach(b => b.addEventListener('click', () => goStep(current + 1)));
   $$('.back-btn').forEach(b => b.addEventListener('click', () => goStep(current - 1)));
   $('#bookingForm')?.addEventListener('submit', submitBooking);
