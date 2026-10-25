@@ -4,6 +4,9 @@ This file is the running checklist for improvements and issues noticed while dev
 
 Last reviewed: 25 October 2026
 
+## Urgent reminder — Monday 26 October 2026, 15:00
+- [ ] **Priority: restore the INSEE Sirene diffusion status to non-public.** The status-change request was accidentally submitted toward public dissemination. After the change takes effect (the portal says up to 24 hours), revisit the official [INSEE Sirene diffusion-status service](https://statut-diffusion-sirene.insee.fr/), check the current status, select the option to be excluded from public dissemination, and carefully verify the summary before confirming. Goal: **“Ne fait pas partie de la diffusion publique.”** Do not confirm unless the summary clearly shows the intended change.
+
 ## Current status
 
 The booking and legal groundwork has been implemented in the code on `main`, but the website is **not yet ready for public bookings**. Legal details and production integrations still need to be completed and tested.
