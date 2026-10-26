@@ -54,7 +54,7 @@ async function validateServiceAddress(address) {
   const distanceKm = haversineKm(SERVICE_AREA_CENTER, point);
   return distanceKm <= SERVICE_AREA_RADIUS_KM
     ? { valid: true, distanceKm: Math.round(distanceKm * 10) / 10 }
-    : { valid: false, reason: 'Cette adresse se trouve en dehors de notre zone de déplacement de 25 km autour du Marché Victor Hugo à Angoulême.' };
+    : { valid: false, reason: 'Cette adresse se trouve en dehors de notre zone de déplacement de 25 km autour de Angoulême.' };
 }
 
 const ALLOWED_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
