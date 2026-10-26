@@ -236,7 +236,7 @@ async function processEmailQueue() {
       }
       await client.query('COMMIT');
     } catch (e) {
-      await client.query('ROLLBACK').catch(() => {});
+      await client.query('ROLLBACK').catch(() => { });
       throw e;
     } finally {
       client.release();
@@ -323,11 +323,11 @@ function detectImageType(buffer) {
   if (buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) {
     return { mime: 'image/jpeg' };
   }
-  if (buffer.length >= 8 && buffer.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) ) {
+  if (buffer.length >= 8 && buffer.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) {
     return { mime: 'image/png' };
   }
   if (buffer.length >= 12 && buffer.toString('ascii', 0, 4) === 'RIFF' &&
-      buffer.toString('ascii', 8, 12) === 'WEBP') {
+    buffer.toString('ascii', 8, 12) === 'WEBP') {
     return { mime: 'image/webp' };
   }
   return null;
@@ -340,8 +340,10 @@ async function uploadPhoto(bookingId, file, detected) {
     Bucket: R2_BUCKET, Key: key, Body: file.buffer, ContentType: detected.mime,
     CacheControl: 'private, max-age=0, no-store', Metadata: { 'booking-id': bookingId }
   }));
-  return { objectKey: key, originalName: path.basename(file.originalname || 'photo').slice(0, 120),
-    contentType: detected.mime, sizeBytes: file.size };
+  return {
+    objectKey: key, originalName: path.basename(file.originalname || 'photo').slice(0, 120),
+    contentType: detected.mime, sizeBytes: file.size
+  };
 }
 async function deleteObjects(objects) {
   if (!r2) return;
@@ -524,7 +526,7 @@ app.post('/api/bookings', bookingRateLimit, (req, res, next) => {
       'INSERT INTO bookings (id, service, vehicle, booking_date, booking_time, first_name, last_name, phone, email, address, water, electricity, vehicle_condition, note, amount_eur, duration_minutes, duration_label, status, terms_accepted_at, terms_version, privacy_version, early_execution_requested, early_execution_requested_at) ' +
       'VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,\'pending\',NOW(),\'2026-10-25\',\'2026-10-25\',$18,CASE WHEN $18 THEN NOW() ELSE NULL END)',
       [id, service, vehicle, date, time, firstName, lastName, phone, email, address, water, electricity, condition, note,
-       details.amount, details.durationMinutes, details.durationLabel, earlyExecutionRequested]
+        details.amount, details.durationMinutes, details.durationLabel, earlyExecutionRequested]
     );
     for (const p of photos) {
       await client.query(
@@ -555,7 +557,7 @@ app.post('/api/bookings', bookingRateLimit, (req, res, next) => {
     });
     await client.query('COMMIT');
   } catch (e) {
-    await client.query('ROLLBACK').catch(() => {});
+    await client.query('ROLLBACK').catch(() => { });
     await deleteObjects(photos);
     throw e;
   } finally { client.release(); }
@@ -565,8 +567,10 @@ app.post('/api/bookings', bookingRateLimit, (req, res, next) => {
 
 
   res.status(201).json({
-    booking: { id, service, vehicle, date, time, firstName, lastName, amount: SERVICES[service].amount, status: 'pending', paymentUrl: null,
-      photos: photos.map(p => ({ name: p.originalName, type: p.contentType })) },
+    booking: {
+      id, service, vehicle, date, time, firstName, lastName, amount: SERVICES[service].amount, status: 'pending', paymentUrl: null,
+      photos: photos.map(p => ({ name: p.originalName, type: p.contentType }))
+    },
     message: 'Demande enregistrée. Aucun paiement n’est demandé en ligne ; le règlement aura lieu après la prestation.'
   });
 }));
@@ -646,7 +650,7 @@ app.post('/api/admin/bookings/:id/decline', adminGuard, asyncHandler(async (req,
     });
     await client.query('COMMIT');
   } catch (e) {
-    await client.query('ROLLBACK').catch(() => {});
+    await client.query('ROLLBACK').catch(() => { });
     throw e;
   } finally {
     client.release();
@@ -721,7 +725,7 @@ app.post('/api/admin/bookings/:id/payment', adminGuard, asyncHandler(async (req,
         '<p>Ce courriel récapitule le règlement enregistré par Épure Auto. Conservez-le pour vos dossiers.</p><p>À bientôt,<br>Épure Auto</p>'
     });
     await client.query('COMMIT');
-  } catch (e) { await client.query('ROLLBACK').catch(() => {}); throw e; }
+  } catch (e) { await client.query('ROLLBACK').catch(() => { }); throw e; }
   finally { client.release(); }
   void processEmailQueue().catch(e => console.error('[EMAIL RECEIPT QUEUE]', e.message));
   const emailResult = await pool.query('SELECT status FROM email_outbox WHERE dedupe_key = $1', ['booking:' + booking.id + ':receipt']);
@@ -761,7 +765,7 @@ async function start() {
 start();
 
 process.on('SIGTERM', async () => {
-  await pool.end().catch(() => {});
+  await pool.end().catch(() => { });
   if (r2) r2.destroy();
   process.exit(0);
 });
