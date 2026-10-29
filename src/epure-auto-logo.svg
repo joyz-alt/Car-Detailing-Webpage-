@@ -2,9 +2,9 @@
 <title id="title">Épure Auto — Nettoyage intérieur</title>
 <g fill="none" stroke-linecap="round" stroke-linejoin="round">
 <path d="M115 99 C177 88 218 39 314 35 C388 32 429 79 510 82 C567 85 621 71 692 78 C638 92 589 91 542 88 C475 83 439 101 375 103 C291 107 225 96 163 104" stroke="#f5f5f5" stroke-width="5"/>
-<path d="M116 108 C207 123 293 116 369 101 C441 86 498 104 566 101 C611 99 652 94 692 88" stroke="#c9b79c" stroke-width="3.5"/>
+<path d="M116 108 C207 123 293 116 369 101 C441 86 498 104 566 101 C611 99 652 94 692 88" stroke="#b89a6a" stroke-width="3.5"/>
 </g>
-<text x="450" y="194" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="75" font-weight="800" letter-spacing="2" fill="#f5f5f5">ÉPURE <tspan fill="#c9b79c">AUTO</tspan></text>
-<path d="M190 225 H290 M610 225 H710" stroke="#c9b79c" stroke-width="2"/>
+<text x="450" y="194" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="75" font-weight="800" letter-spacing="2" fill="#f5f5f5">ÉPURE <tspan fill="#b89a6a">AUTO</tspan></text>
+<path d="M190 225 H290 M610 225 H710" stroke="#b89a6a" stroke-width="2"/>
 <text x="450" y="233" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="21" letter-spacing="8" fill="#f5f5f5">NETTOYAGE INTÉRIEUR</text>
 </svg>

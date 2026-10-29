@@ -1,8 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title">
 <title id="title">Épure Auto — EA</title>
 <rect width="128" height="128" rx="14" fill="#0b0d10"/>
-<rect x="3" y="3" width="122" height="122" rx="12" fill="none" stroke="#c9b79c" stroke-width="1.5"/>
+<rect x="3" y="3" width="122" height="122" rx="12" fill="none" stroke="#b89a6a" stroke-width="1.5"/>
 <path d="M19 53 C34 50 43 33 61 31 C77 29 88 45 108 46 C96 49 84 48 73 45 C59 42 49 45 37 51 Z" fill="none" stroke="#f5f5f5" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M20 55 C37 58 51 55 64 51 C78 47 91 52 108 50" fill="none" stroke="#c9b79c" stroke-width="2.4" stroke-linecap="round"/>
-<text x="64" y="94" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="39" font-weight="700" letter-spacing="-2" fill="#f5f5f5">E<tspan fill="#c9b79c">A</tspan></text>
+<path d="M20 55 C37 58 51 55 64 51 C78 47 91 52 108 50" fill="none" stroke="#b89a6a" stroke-width="2.4" stroke-linecap="round"/>
+<text x="64" y="94" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="39" font-weight="700" letter-spacing="-2" fill="#f5f5f5">E<tspan fill="#b89a6a">A</tspan></text>
 </svg>
