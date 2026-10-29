@@ -397,7 +397,7 @@ app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true, limit: '100kb' }));
 
 // Explicit allow-list: do not accidentally publish server.js, environment files, or data.
-const PUBLIC_FILES = new Set(['/', '/index.html', '/styles.css', '/app.js', '/admin.html', '/admin.js', '/success.html', '/reservation-annulee.html', '/mentions-legales.html', '/politique-confidentialite.html', '/cgv.html', '/formulaire-retractation.html']);
+const PUBLIC_FILES = new Set(['/', '/index.html', '/styles.css', '/app.js', '/admin.html', '/admin.js', '/success.html', '/reservation-annulee.html', '/mentions-legales.html', '/politique-confidentialite.html', '/cgv.html', '/formulaire-retractation.html', '/favicon.svg', '/epure-auto-logo.svg']);
 app.get([...PUBLIC_FILES], (req, res, next) => {
   const file = req.path === '/' ? 'index.html' : req.path.slice(1);
   res.sendFile(path.join(__dirname, file), e => { if (e) next(e); });
