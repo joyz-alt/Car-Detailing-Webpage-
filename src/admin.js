@@ -54,21 +54,21 @@ function renderBookings(rs) {
       : '';
     const paymentForm = canRecordPayment
       ? '<div class="payment-config">' +
-        '<label>Formule finale<select data-field="service">' + serviceOptions + '</select></label>' +
-        '<label>Suppléments (une ligne par extra : intitulé | prix en €)' +
-        '<textarea data-field="addons" rows="3" placeholder="Poils d’animaux | 20&#10;Traitement des taches | 15">' +
-        escapeHtml(savedAddons) + '</textarea></label>' +
-        '<label>Mode de règlement<select data-field="paymentMethod"><option value="card">Carte bancaire (terminal / application)</option><option value="cash">Espèces</option></select></label>' +
-        '<small class="empty">Enregistrez uniquement après le nettoyage et après avoir réellement reçu le règlement. Le client doit avoir accepté la formule et chaque supplément.</small>' +
-        '<button class="btn btn-primary btn-small" data-action="payment" data-id="' + escapeHtml(r.id) + '">Enregistrer le paiement reçu et envoyer le reçu</button>' +
-        '<button class="btn btn-secondary btn-small" data-action="decline" data-id="' + escapeHtml(r.id) + '">Refuser la demande</button></div>'
+      '<label>Formule finale<select data-field="service">' + serviceOptions + '</select></label>' +
+      '<label>Suppléments (une ligne par extra : intitulé | prix en €)' +
+      '<textarea data-field="addons" rows="3" placeholder="Poils d’animaux | 20&#10;Traitement des taches | 15">' +
+      escapeHtml(savedAddons) + '</textarea></label>' +
+      '<label>Mode de règlement<select data-field="paymentMethod"><option value="card">Carte bancaire (terminal / application)</option><option value="cash">Espèces</option></select></label>' +
+      '<small class="empty">Enregistrez uniquement après le nettoyage et après avoir réellement reçu le règlement. Le client doit avoir accepté la formule et chaque supplément.</small>' +
+      '<button class="btn btn-primary btn-small" data-action="payment" data-id="' + escapeHtml(r.id) + '">Enregistrer le paiement reçu et envoyer le reçu</button>' +
+      '<button class="btn btn-secondary btn-small" data-action="decline" data-id="' + escapeHtml(r.id) + '">Refuser la demande</button></div>'
       : '';
     const receiptDetails = r.status === 'confirmed'
       ? '<div class="payment-receipt"><strong>Règlement enregistré : ' + escapeHtml(r.amount) + ' €</strong><br>Mode : ' +
-        escapeHtml(r.paymentMethod === 'card' ? 'Carte bancaire' : r.paymentMethod === 'cash' ? 'Espèces' : 'Non renseigné') +
-        (Array.isArray(r.paymentItems) && r.paymentItems.length
-          ? '<ul>' + r.paymentItems.map(item => '<li>' + escapeHtml(item.name) + ' : ' + escapeHtml(item.amount) + ' €</li>').join('') + '</ul>' : '') +
-        '</div>' : '';
+      escapeHtml(r.paymentMethod === 'card' ? 'Carte bancaire' : r.paymentMethod === 'cash' ? 'Espèces' : 'Non renseigné') +
+      (Array.isArray(r.paymentItems) && r.paymentItems.length
+        ? '<ul>' + r.paymentItems.map(item => '<li>' + escapeHtml(item.name) + ' : ' + escapeHtml(item.amount) + ' €</li>').join('') + '</ul>' : '') +
+      '</div>' : '';
 
     return '<li class="booking-admin-item"><div><strong>' + escapeHtml(r.date) + ' · ' + escapeHtml(r.time) +
       '</strong> <span class="status status-' + escapeHtml(r.status) + '">' + escapeHtml(labelStatus(r.status)) +
@@ -79,7 +79,7 @@ function renderBookings(rs) {
       '</strong> · Électricité : <strong>' + escapeHtml(r.electricity || 'Non renseigné') +
       '</strong><br>État : ' + escapeHtml(r.condition || '') + (r.note ? ' · ' + escapeHtml(r.note) : '') +
       '</span>' + (photos ? '<div class="admin-photo-grid" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px">' + photos + '</div>' :
-      ((r.photos || []).length ? '<br><span class="photo-count">Photos enregistrées, mais leur stockage n’est pas disponible.</span>' : '')) +
+        ((r.photos || []).length ? '<br><span class="photo-count">Photos enregistrées, mais leur stockage n’est pas disponible.</span>' : '')) +
       receiptDetails + paymentForm + '</div></li>';
   }).join('');
 }
@@ -240,11 +240,11 @@ $('#blockBtn').onclick = async () => {
 };
 $('#clearBtn').onclick = () => render();
 $('#refreshEmails').onclick = () => renderNotifications();
-if (!ADMIN_KEY) { 
-  ADMIN_KEY = prompt('Clé administrateur (ADMIN_KEY) :') || ''; 
-  
-  if (ADMIN_KEY) 
-    localStorage.setItem('epure_admin_key', ADMIN_KEY); 
-  
+if (!ADMIN_KEY) {
+  ADMIN_KEY = prompt('Clé administrateur (ADMIN_KEY) :') || '';
+
+  if (ADMIN_KEY)
+    localStorage.setItem('epure_admin_key', ADMIN_KEY);
+
 }
 render();
