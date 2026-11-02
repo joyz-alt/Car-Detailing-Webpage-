@@ -1943,3 +1943,70 @@ body {
     gap: 8px;
   }
 }
+
+/* Real customer portfolio — responsive before/after feature */
+.portfolio-feature {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(280px, .85fr);
+  gap: clamp(28px, 5vw, 64px);
+  align-items: center;
+  margin-top: 52px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  background: linear-gradient(145deg, #15191e, #101317);
+}
+.portfolio-image-wrap {
+  min-width: 0;
+  overflow: hidden;
+  background: #090b0d;
+}
+.portfolio-image-wrap img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 500 / 430;
+  object-fit: cover;
+}
+.portfolio-copy {
+  padding: clamp(12px, 2vw, 30px);
+}
+.portfolio-kicker {
+  display: block;
+  margin-bottom: 18px;
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .18em;
+}
+.portfolio-copy h3 {
+  margin: 0 0 14px;
+  font: 800 clamp(25px, 3vw, 38px)/1.08 Manrope, sans-serif;
+  letter-spacing: -.035em;
+}
+.portfolio-copy p {
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.75;
+}
+.portfolio-copy .text-link {
+  margin-top: 12px;
+}
+.portfolio-note {
+  margin: 12px 0 0;
+  color: #737a82;
+  font-size: 11px;
+}
+@media (max-width: 850px) {
+  .portfolio-feature {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+    margin-top: 34px;
+    padding: 10px;
+  }
+  .portfolio-copy {
+    padding: 20px 12px 24px;
+  }
+  .portfolio-image-wrap img {
+    aspect-ratio: 500 / 430;
+  }
+}
