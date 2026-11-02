@@ -396,6 +396,19 @@ async function isAvailableInTransaction(client, date, time, service) {
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true, limit: '100kb' }));
 
+// Curated portfolio photos are served from the private source-photo folder via fixed public aliases.
+const PORTFOLIO_PHOTOS = {
+  '/portfolio/nathan-before-cockpit.jpeg': '../photos/nathan_tlm_31-10-2026/to use/before/WYPaQLDR.jpeg',
+  '/portfolio/nathan-after-cockpit.jpeg': '../photos/nathan_tlm_31-10-2026/to use/after/PyBRKyi0.jpeg',
+  '/portfolio/nathan-before-passenger.jpeg': '../photos/nathan_tlm_31-10-2026/to use/before/L8qf_Uey.jpeg',
+  '/portfolio/nathan-after-passenger.jpeg': '../photos/nathan_tlm_31-10-2026/to use/after/wnhrTVDt.jpeg',
+  '/portfolio/nathan-before-rear-floor.jpeg': '../photos/nathan_tlm_31-10-2026/to use/before/45d-eaSc.jpeg',
+  '/portfolio/nathan-after-rear-floor.jpeg': '../photos/nathan_tlm_31-10-2026/to use/after/swN4Qdc-.jpeg'
+};
+app.get(Object.keys(PORTFOLIO_PHOTOS), (req, res, next) => {
+  res.sendFile(path.resolve(__dirname, PORTFOLIO_PHOTOS[req.path]), e => { if (e) next(e); });
+});
+
 // Explicit allow-list: do not accidentally publish server.js, environment files, or data.
 const PUBLIC_FILES = new Set(['/', '/index.html', '/styles.css', '/app.js', '/admin.html', '/admin.js', '/success.html', '/reservation-annulee.html', '/mentions-legales.html', '/politique-confidentialite.html', '/cgv.html', '/formulaire-retractation.html', '/favicon.svg', '/favicon.png', '/images/nathan-before-after.webp', '/epure-auto-logo.svg', '/sitemap.xml', '/robots.txt']);
 app.get([...PUBLIC_FILES], (req, res, next) => {
