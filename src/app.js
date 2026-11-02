@@ -4,8 +4,9 @@ let current = 1;
 let slots = [];
 
 const serviceData = {
-  Essentiel: { amount: 90, duration: '1h30 à 2h30' },
-  Intégral: { amount: 130, duration: '2h30 à 3h30' }
+  Entretien: { amount: 69, duration: '1h30 à 2h' },
+  'Nettoyage complet': { amount: 109, duration: '2h30 à 3h30' },
+  'Rénovation intérieure': { amount: 149, duration: '4h à 5h' }
 };
 
 function todayISO() {
