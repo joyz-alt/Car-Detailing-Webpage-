@@ -2,7 +2,7 @@
 CREATE TABLE IF NOT EXISTS bookings (
   id TEXT PRIMARY KEY,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  service TEXT NOT NULL CHECK (service IN ('Essentiel', 'Intégral')),
+  service TEXT NOT NULL CHECK (service IN ('Essentiel', 'Intégral', 'Entretien', 'Nettoyage complet', 'Rénovation intérieure')),
   vehicle TEXT NOT NULL DEFAULT 'Non renseigné',
   booking_date DATE NOT NULL,
   booking_time TIME NOT NULL,
