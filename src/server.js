@@ -25,7 +25,8 @@ const SERVICES = {
   'Nettoyage complet': { amount: 109, durationMinutes: 180, durationLabel: '2h30 à 3h30' },
   'Rénovation intérieure': { amount: 149, durationMinutes: 270, durationLabel: '4h à 5h' }
 };
-const SLOTS = ['09:00', '10:30', '12:00', '13:00', '14:00', '14:30', '15:30', '17:00'];
+const SLOTS = ['08:00', '09:00', '10:00', '12:00', '13:00', '14:00'];
+const BUFFER_MINUTES = 60;
 const SERVICE_AREA_CENTER = { lat: 45.64889, lon: 0.17426 }; // Marché Victor Hugo, Angoulême
 const SERVICE_AREA_RADIUS_KM = 25;
 function haversineKm(a, b) {
@@ -378,13 +379,13 @@ async function photoList(bookingId) {
   return Promise.all(result.rows.map(async p => ({ id: p.id, name: p.name, type: p.type, url: await signPhoto(p.objectKey) })));
 }
 async function isAvailableInTransaction(client, date, time, service) {
-  const duration = SERVICES[service].durationMinutes;
+  const duration = SERVICES[service].durationMinutes + BUFFER_MINUTES;
   // Lock each day's schedule so simultaneous requests cannot both reserve the same slot.
   await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [date]);
   const booked = await client.query(
     'SELECT 1 FROM bookings WHERE booking_date = $1 AND status = ANY($2::text[]) ' +
     'AND booking_time < ($3::time + ($4 * interval \'1 minute\')) ' +
-    'AND booking_time + duration_minutes * interval \'1 minute\' > $3::time LIMIT 1',
+    'AND booking_time + (duration_minutes + ' + BUFFER_MINUTES + ') * interval \'1 minute\' > $3::time LIMIT 1',
     [date, ACTIVE_STATUSES, time, duration]
   );
   if (booked.rowCount) return false;
@@ -450,11 +451,11 @@ app.get('/api/availability', availabilityRateLimit, asyncHandler(async (req, res
   try {
     const slots = [];
     for (const time of SLOTS) {
-      const duration = SERVICES[service].durationMinutes;
+      const duration = SERVICES[service].durationMinutes + BUFFER_MINUTES;
       const booked = await client.query(
         'SELECT 1 FROM bookings WHERE booking_date = $1 AND status = ANY($2::text[]) ' +
         'AND booking_time < ($3::time + ($4 * interval \'1 minute\')) ' +
-        'AND booking_time + duration_minutes * interval \'1 minute\' > $3::time LIMIT 1',
+        'AND booking_time + (duration_minutes + ' + BUFFER_MINUTES + ') * interval \'1 minute\' > $3::time LIMIT 1',
         [date, ACTIVE_STATUSES, time, duration]
       );
       const blocked = await client.query(
@@ -707,14 +708,14 @@ app.post('/api/admin/bookings/:id/payment', adminGuard, asyncHandler(async (req,
       const overlap = await client.query(
         'SELECT 1 FROM bookings WHERE id <> $1 AND booking_date = $2 AND status = ANY($3::text[]) ' +
         'AND booking_time < ($4::time + ($5 * interval \'1 minute\')) ' +
-        'AND booking_time + duration_minutes * interval \'1 minute\' > $4::time LIMIT 1',
-        [booking.id, booking.date, ACTIVE_STATUSES, booking.time, packageDetails.durationMinutes]
+        'AND booking_time + (duration_minutes + ' + BUFFER_MINUTES + ') * interval \'1 minute\' > $4::time LIMIT 1',
+        [booking.id, booking.date, ACTIVE_STATUSES, booking.time, packageDetails.durationMinutes + BUFFER_MINUTES]
       );
       const blocked = await client.query(
         'SELECT 1 FROM booking_blocks WHERE block_date = $1 ' +
         'AND block_time < ($2::time + ($3 * interval \'1 minute\')) ' +
         'AND block_time + interval \'1 hour\' > $2::time LIMIT 1',
-        [booking.date, booking.time, packageDetails.durationMinutes]
+        [booking.date, booking.time, packageDetails.durationMinutes + BUFFER_MINUTES]
       );
       if (overlap.rowCount || blocked.rowCount) {
         await client.query('ROLLBACK');
