@@ -2391,3 +2391,27 @@ body {
     padding-right: 2px;
   }
 }
+
+
+/* Keep the three key benefits aligned in one row on mobile. */
+@media (max-width: 800px) {
+  .trust-row {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    align-items: start;
+    gap: 10px;
+    flex-wrap: nowrap;
+  }
+  .trust-row > div { min-width: 0; }
+  .trust-row strong {
+    display: block;
+    font-size: clamp(13px, 3.6vw, 16px);
+    line-height: 1.2;
+    white-space: normal;
+  }
+  .trust-row span {
+    display: block;
+    font-size: clamp(10px, 2.8vw, 12px);
+    line-height: 1.35;
+  }
+}
