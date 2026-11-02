@@ -2289,3 +2289,43 @@ body {
     font-size: 40px;
   }
 }
+
+
+/* Three-tier service carousel */
+.services-intro { color: var(--muted); max-width: 620px; margin: 12px 0 0; }
+.service-carousel { position: relative; margin-top: 34px; }
+.service-track {
+  display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr);
+  grid-auto-columns: 1fr; gap: 18px; overflow-x: auto; scroll-snap-type: x mandatory;
+  scrollbar-width: none; padding: 8px 2px 16px; scroll-behavior: smooth;
+}
+.service-track::-webkit-scrollbar { display: none; }
+.service-track .service-card {
+  min-width: 0; scroll-snap-align: center; position: relative;
+  background: linear-gradient(155deg, #171a1f, #101216 70%);
+  border: 1px solid var(--line); border-radius: 18px; padding: 28px 25px;
+}
+.service-track .service-card.featured { border-color: rgba(184,154,106,.75); }
+.service-track .service-card h3 { font-size: clamp(21px,2vw,27px); margin: 18px 0 7px; }
+.service-track .service-card > p { color: var(--muted); min-height: 48px; }
+.service-track .price { margin: 16px 0 18px; }
+.service-track .price strong { font-size: 42px; letter-spacing: -.04em; }
+.service-features { list-style: none; padding: 0; margin: 0 0 24px; display: grid; gap: 12px; }
+.service-features li { display: grid; grid-template-columns: 20px 1fr; align-items: start; gap: 9px; color: #e6e4df; font-size: 14px; line-height: 1.45; }
+.feature-yes { color: var(--accent); font-weight: 800; font-size: 17px; line-height: 1.2; }
+.feature-no { color: #777d86; font-weight: 700; font-size: 17px; line-height: 1.2; }
+.service-carousel-controls { display: flex; justify-content: center; align-items: center; gap: 22px; margin-top: 8px; }
+.service-arrow { width: 42px; height: 42px; border: 1px solid var(--line); border-radius: 50%; color: var(--text); background: var(--panel); font-size: 20px; cursor: pointer; }
+.service-arrow:disabled { opacity: .3; cursor: default; }
+.service-dots { display: flex; gap: 9px; align-items: center; }
+.service-dot { width: 7px; height: 7px; padding: 0; border: 0; border-radius: 50%; background: #555b64; cursor: pointer; }
+.service-dot.active { width: 22px; border-radius: 8px; background: var(--accent); }
+.service-carousel-hint { text-align: center; color: var(--muted); font-size: 12px; margin: 10px 0 0; }
+@media (max-width: 800px) {
+  .service-track { grid-auto-columns: 88%; gap: 12px; padding-left: 5%; padding-right: 5%; }
+  .service-track .service-card { padding: 25px 21px; }
+  .service-track .service-card > p { min-height: auto; }
+}
+@media (min-width: 801px) {
+  .service-track { grid-auto-columns: calc((100% - 36px) / 3); }
+}
