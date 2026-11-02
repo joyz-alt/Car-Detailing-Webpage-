@@ -2329,3 +2329,65 @@ body {
 @media (min-width: 801px) {
   .service-track { grid-auto-columns: calc((100% - 36px) / 3); }
 }
+
+
+/* Carousel layout correction: each feature row has one marker and one text column. */
+.service-track {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: calc((100% - 36px) / 3);
+  align-items: stretch;
+  min-width: 0;
+  width: 100%;
+}
+.service-track .service-card {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  overflow-wrap: normal;
+}
+.service-features li::before,
+.service-track .service-card li::before {
+  content: none !important;
+  display: none !important;
+}
+.service-features li > span:first-child {
+  display: block;
+  width: 20px;
+  min-width: 20px;
+  text-align: center;
+}
+.service-features li > span:last-child {
+  display: block;
+  min-width: 0;
+  overflow-wrap: break-word;
+  word-break: normal;
+}
+@media (max-width: 800px) {
+  .service-carousel { width: 100%; min-width: 0; }
+  .service-track {
+    grid-auto-columns: min(88%, 390px);
+    gap: 12px;
+    padding: 8px 6% 16px;
+    scroll-padding-inline: 6%;
+  }
+  .service-track .service-card {
+    padding: 25px 22px;
+  }
+  .service-features {
+    gap: 13px;
+  }
+  .service-features li {
+    grid-template-columns: 20px minmax(0, 1fr);
+    gap: 10px;
+    font-size: 15px;
+    line-height: 1.5;
+  }
+}
+@media (min-width: 801px) {
+  .service-track {
+    grid-auto-columns: calc((100% - 36px) / 3);
+    padding-left: 2px;
+    padding-right: 2px;
+  }
+}
