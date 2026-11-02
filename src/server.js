@@ -21,8 +21,9 @@ const MAX_PHOTOS = 5;
 const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
 const ACTIVE_STATUSES = ['pending', 'confirmed'];
 const SERVICES = {
-  Essentiel: { amount: 90, durationMinutes: 120, durationLabel: '1h30 à 2h30' },
-  Intégral: { amount: 130, durationMinutes: 180, durationLabel: '2h30 à 3h30' }
+  Entretien: { amount: 69, durationMinutes: 120, durationLabel: '1h30 à 2h' },
+  'Nettoyage complet': { amount: 109, durationMinutes: 180, durationLabel: '2h30 à 3h30' },
+  'Rénovation intérieure': { amount: 149, durationMinutes: 270, durationLabel: '4h à 5h' }
 };
 const SLOTS = ['09:00', '10:30', '12:00', '13:00', '14:00', '14:30', '15:30', '17:00'];
 const SERVICE_AREA_CENTER = { lat: 45.64889, lon: 0.17426 }; // Marché Victor Hugo, Angoulême
@@ -437,7 +438,7 @@ app.get('/api/email-status', adminGuard, asyncHandler(async (req, res) => {
 
 app.get('/api/availability', availabilityRateLimit, asyncHandler(async (req, res) => {
   const date = text(req.query.date, 10);
-  const service = text(req.query.service || 'Essentiel', 30);
+  const service = text(req.query.service || 'Entretien', 30);
   if (!isValidDate(date)) return res.status(400).json({ error: 'Date invalide.' });
   if (date < parisToday()) return res.status(400).json({ error: 'La date doit être aujourd’hui ou dans le futur.' });
   if (!SERVICES[service]) return res.status(400).json({ error: 'Prestation invalide.' });
