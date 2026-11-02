@@ -25,10 +25,9 @@
     "areaServed":[{"@type":"City","name":"Angoulême"},{"@type":"AdministrativeArea","name":"Charente"}],
     "hasOfferCatalog":{"@type":"OfferCatalog","name":"Nettoyage intérieur automobile","itemListElement":[
       {"@type":"Offer","name":"Entretien","price":"69","priceCurrency":"EUR","itemOffered":{"@type":"Service","name":"Nettoyage intérieur Entretien","areaServed":"Angoulême et alentours"}},
-      {"@type":"Offer","name":"Nettoyage complet","price":"109","priceCurrency":"EUR","itemOffered":{"@type":"Service","name":"Nettoyage intérieur complet","areaServed":"Angoulême et alentours"}}
-    ]}
-  }
-  </script>
+      {"@type":"Offer","name":"Nettoyage complet","price":"109","priceCurrency":"EUR","itemOffered":{"@type":"Service","name":"Nettoyage intérieur complet","areaServed":"Angoulême et alentours"}},
+      {"@type":"Offer","name":"Rénovation intérieure","price":"149","priceCurrency":"EUR","itemOffered":{"@type":"Service","name":"Rénovation intérieure automobile","areaServed":"Angoulême et alentours"}}
+    ]}</script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
@@ -195,8 +194,9 @@
             </div>
             <label>Prestation<select id="service" required>
                 <option value="">Choisir une prestation</option>
-                <option>Essentiel — 90€</option>
-                <option>Intégral — 130€</option>
+                <option>Entretien — 69€</option>
+                <option>Nettoyage complet — 109€</option>
+                <option>Rénovation intérieure — 149€</option>
               </select></label>
             <button type="button" class="btn btn-primary next-btn">Continuer →</button>
           </div>
