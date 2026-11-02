@@ -404,6 +404,15 @@ textarea {
   margin-right: 9px
 }
 
+.service-card li.not-included {
+  color: #777d85;
+}
+
+.service-card li.not-included:before {
+  content: "×";
+  color: #777d85;
+}
+
 .service-cta {
   position: absolute;
   bottom: 27px;
