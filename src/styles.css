@@ -2366,10 +2366,10 @@ body {
 @media (max-width: 800px) {
   .service-carousel { width: 100%; min-width: 0; }
   .service-track {
-    grid-auto-columns: min(88%, 390px);
+    grid-auto-columns: min(94%, 460px);
     gap: 12px;
-    padding: 8px 6% 16px;
-    scroll-padding-inline: 6%;
+    padding: 8px 3% 16px;
+    scroll-padding-inline: 3%;
   }
   .service-track .service-card {
     padding: 25px 22px;
