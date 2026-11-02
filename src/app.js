@@ -368,3 +368,41 @@ init();
   updateDots();
   window.addEventListener('resize', updateDots);
 })();
+
+
+// Swipe and arrow controls for the service comparison carousel.
+(() => {
+  const track = document.getElementById('serviceTrack');
+  if (!track) return;
+  const cards = [...track.querySelectorAll('.service-card')];
+  const dots = [...document.querySelectorAll('.service-dot')];
+  const prev = document.getElementById('servicePrev');
+  const next = document.getElementById('serviceNext');
+  let activeIndex = 0;
+  const goTo = index => {
+    activeIndex = Math.max(0, Math.min(cards.length - 1, index));
+    track.scrollTo({ left: cards[activeIndex].offsetLeft - track.offsetLeft, behavior: 'smooth' });
+    update();
+  };
+  const update = () => {
+    const width = cards[0] ? cards[0].getBoundingClientRect().width + 18 : 1;
+    activeIndex = Math.max(0, Math.min(cards.length - 1, Math.round(track.scrollLeft / width)));
+    dots.forEach((dot, i) => {
+      dot.classList.toggle('active', i === activeIndex);
+      if (i === activeIndex) dot.setAttribute('aria-current', 'true');
+      else dot.removeAttribute('aria-current');
+    });
+    if (prev) prev.disabled = activeIndex === 0;
+    if (next) next.disabled = activeIndex === cards.length - 1;
+  };
+  prev?.addEventListener('click', () => goTo(activeIndex - 1));
+  next?.addEventListener('click', () => goTo(activeIndex + 1));
+  dots.forEach((dot, i) => dot.addEventListener('click', () => goTo(i)));
+  track.addEventListener('scroll', update, { passive: true });
+  track.addEventListener('keydown', event => {
+    if (event.key === 'ArrowRight') goTo(activeIndex + 1);
+    if (event.key === 'ArrowLeft') goTo(activeIndex - 1);
+  });
+  update();
+  window.addEventListener('resize', update);
+})();
