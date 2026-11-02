@@ -298,3 +298,73 @@ function init() {
 }
 
 init();
+
+
+// Swipe, mouse-drag and arrow controls for the before/after portfolio.
+(() => {
+  const track = document.getElementById('portfolioTrack');
+  if (!track) return;
+  const cards = [...track.querySelectorAll('.portfolio-pair')];
+  const dots = [...document.querySelectorAll('.portfolio-dot')];
+  const prev = document.getElementById('portfolioPrev');
+  const next = document.getElementById('portfolioNext');
+  let activeIndex = 0;
+  let pointerStart = null;
+  let scrollStart = 0;
+  let dragged = false;
+
+  const cardStep = () => cards[0] ? cards[0].getBoundingClientRect().width + 16 : 0;
+  const goTo = index => {
+    activeIndex = Math.max(0, Math.min(cards.length - 1, index));
+    track.scrollTo({ left: activeIndex * cardStep(), behavior: 'smooth' });
+    updateDots();
+  };
+  const updateDots = () => {
+    const step = cardStep() || 1;
+    const index = Math.max(0, Math.min(cards.length - 1, Math.round(track.scrollLeft / step)));
+    activeIndex = index;
+    dots.forEach((dot, i) => {
+      dot.classList.toggle('active', i === index);
+      if (i === index) dot.setAttribute('aria-current', 'true');
+      else dot.removeAttribute('aria-current');
+    });
+    if (prev) prev.disabled = index === 0;
+    if (next) next.disabled = index === cards.length - 1;
+  };
+  prev?.addEventListener('click', () => goTo(activeIndex - 1));
+  next?.addEventListener('click', () => goTo(activeIndex + 1));
+  dots.forEach((dot, i) => dot.addEventListener('click', () => goTo(i)));
+  track.addEventListener('scroll', updateDots, { passive: true });
+  track.addEventListener('keydown', event => {
+    if (event.key === 'ArrowRight') goTo(activeIndex + 1);
+    if (event.key === 'ArrowLeft') goTo(activeIndex - 1);
+  });
+  track.addEventListener('pointerdown', event => {
+    if (event.pointerType === 'touch' || event.button !== 0) return;
+    pointerStart = event.clientX;
+    scrollStart = track.scrollLeft;
+    dragged = false;
+    track.classList.add('is-dragging');
+    track.setPointerCapture(event.pointerId);
+  });
+  track.addEventListener('pointermove', event => {
+    if (pointerStart === null) return;
+    const delta = event.clientX - pointerStart;
+    if (Math.abs(delta) > 4) dragged = true;
+    if (dragged) track.scrollLeft = scrollStart - delta;
+  });
+  const stopDrag = () => {
+    if (pointerStart === null) return;
+    pointerStart = null;
+    track.classList.remove('is-dragging');
+    if (dragged) {
+      const index = Math.round(track.scrollLeft / (cardStep() || 1));
+      goTo(index);
+    }
+  };
+  track.addEventListener('pointerup', stopDrag);
+  track.addEventListener('pointercancel', stopDrag);
+  track.addEventListener('lostpointercapture', stopDrag);
+  updateDots();
+  window.addEventListener('resize', updateDots);
+})();
