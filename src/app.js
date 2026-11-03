@@ -51,45 +51,77 @@ function validateStep(step) {
   return true;
 }
 
+let availabilityWeekOffset = 0;
+
 async function loadSlots() {
   const box = $('#slots');
-  box.innerHTML = '<span class="empty-slot">Recherche des prochains rendez-vous…</span>';
+  const prev = $('#weekPrev');
+  const next = $('#weekNext');
+  const label = $('#weekLabel');
+  box.innerHTML = '<span class="empty-slot">Recherche des disponibilités…</span>';
   $('#date').value = '';
   $('#time').value = '';
 
   try {
-    const r = await fetch(`/api/next-availability?service=${encodeURIComponent(selectedService())}`);
+    const r = await fetch(`/api/next-availability?service=${encodeURIComponent(selectedService())}&week=${availabilityWeekOffset}`);
     const data = await r.json();
     if (!r.ok) throw new Error(data.error || 'Erreur');
-    const upcoming = data.slots || [];
+
+    label.textContent = data.weekLabel || '';
+    prev.disabled = availabilityWeekOffset === 0;
+    next.disabled = !data.hasNextWeek;
     box.innerHTML = '';
 
-    if (!upcoming.length) {
-      box.innerHTML = '<span class="empty-slot">Aucun rendez-vous disponible dans les 60 prochains jours. Contactez-nous pour étudier une autre possibilité.</span>';
+    const days = data.days || [];
+    if (!days.some(day => day.slots.length)) {
+      box.innerHTML = '<span class="empty-slot">Aucun créneau disponible cette semaine. Passez à la semaine suivante pour consulter les prochaines disponibilités.</span>';
       return;
     }
 
-    upcoming.forEach(slot => {
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.className = 'slot availability-card';
-      const dateLabel = new Date(slot.date + 'T12:00:00').toLocaleDateString('fr-FR', {
-        weekday: 'long', day: 'numeric', month: 'long'
+    days.forEach(day => {
+      const card = document.createElement('section');
+      card.className = 'availability-day' + (day.slots.length ? '' : ' is-full');
+      const dateLabel = new Date(day.date + 'T12:00:00').toLocaleDateString('fr-FR', {
+        weekday: 'short', day: 'numeric', month: 'short'
       });
-      const date = dateLabel.charAt(0).toUpperCase() + dateLabel.slice(1);
-      button.innerHTML = `<span class="availability-date">${date}</span><strong class="availability-time">${slot.time}</strong>`;
-      button.setAttribute('aria-label', `${date} à ${slot.time}`);
-      button.onclick = () => {
-        $$('.availability-card').forEach(item => item.classList.remove('selected'));
-        button.classList.add('selected');
-        $('#date').value = slot.date;
-        $('#time').value = slot.time;
-        updateEarlyExecutionConsent();
-      };
-      box.appendChild(button);
+      const heading = document.createElement('h4');
+      heading.textContent = dateLabel.charAt(0).toUpperCase() + dateLabel.slice(1);
+      card.appendChild(heading);
+
+      if (!day.slots.length) {
+        const full = document.createElement('span');
+        full.className = 'availability-full';
+        full.textContent = 'Complet';
+        card.appendChild(full);
+      } else {
+        const times = document.createElement('div');
+        times.className = 'availability-times';
+        day.slots.forEach(slot => {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.className = 'availability-time-button';
+          button.textContent = slot.time;
+          button.setAttribute('aria-label', `${dateLabel} à ${slot.time}`);
+          button.onclick = () => {
+            $$('.availability-time-button').forEach(item => {
+              item.classList.remove('selected');
+              item.setAttribute('aria-pressed', 'false');
+            });
+            button.classList.add('selected');
+            button.setAttribute('aria-pressed', 'true');
+            $('#date').value = slot.date;
+            $('#time').value = slot.time;
+            updateEarlyExecutionConsent();
+          };
+          button.setAttribute('aria-pressed', 'false');
+          times.appendChild(button);
+        });
+        card.appendChild(times);
+      }
+      box.appendChild(card);
     });
   } catch (err) {
-    box.innerHTML = '<span class="empty-slot">Impossible de charger les prochains rendez-vous. Veuillez réessayer.</span>';
+    box.innerHTML = '<span class="empty-slot">Impossible de charger les disponibilités. Veuillez réessayer.</span>';
   }
 }
 
@@ -289,7 +321,9 @@ function init() {
     goStep(2);
   });
 
-  $('#service')?.addEventListener('change', loadSlots);
+  $('#service')?.addEventListener('change', () => { availabilityWeekOffset = 0; loadSlots(); });
+  $('#weekPrev')?.addEventListener('click', () => { if (availabilityWeekOffset > 0) { availabilityWeekOffset--; loadSlots(); } });
+  $('#weekNext')?.addEventListener('click', () => { availabilityWeekOffset++; loadSlots(); });
     $('#photos')?.addEventListener('change', handlePhotoSelection);
   renderPhotoList();
   $$('.next-btn').forEach(b => b.addEventListener('click', () => goStep(current + 1)));
@@ -367,42 +401,4 @@ init();
   track.addEventListener('lostpointercapture', stopDrag);
   updateDots();
   window.addEventListener('resize', updateDots);
-})();
-
-
-// Swipe and arrow controls for the service comparison carousel.
-(() => {
-  const track = document.getElementById('serviceTrack');
-  if (!track) return;
-  const cards = [...track.querySelectorAll('.service-card')];
-  const dots = [...document.querySelectorAll('.service-dot')];
-  const prev = document.getElementById('servicePrev');
-  const next = document.getElementById('serviceNext');
-  let activeIndex = 0;
-  const goTo = index => {
-    activeIndex = Math.max(0, Math.min(cards.length - 1, index));
-    track.scrollTo({ left: cards[activeIndex].offsetLeft - track.offsetLeft, behavior: 'smooth' });
-    update();
-  };
-  const update = () => {
-    const width = cards[0] ? cards[0].getBoundingClientRect().width + 18 : 1;
-    activeIndex = Math.max(0, Math.min(cards.length - 1, Math.round(track.scrollLeft / width)));
-    dots.forEach((dot, i) => {
-      dot.classList.toggle('active', i === activeIndex);
-      if (i === activeIndex) dot.setAttribute('aria-current', 'true');
-      else dot.removeAttribute('aria-current');
-    });
-    if (prev) prev.disabled = activeIndex === 0;
-    if (next) next.disabled = activeIndex === cards.length - 1;
-  };
-  prev?.addEventListener('click', () => goTo(activeIndex - 1));
-  next?.addEventListener('click', () => goTo(activeIndex + 1));
-  dots.forEach((dot, i) => dot.addEventListener('click', () => goTo(i)));
-  track.addEventListener('scroll', update, { passive: true });
-  track.addEventListener('keydown', event => {
-    if (event.key === 'ArrowRight') goTo(activeIndex + 1);
-    if (event.key === 'ArrowLeft') goTo(activeIndex - 1);
-  });
-  update();
-  window.addEventListener('resize', update);
 })();
