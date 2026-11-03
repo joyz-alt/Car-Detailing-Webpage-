@@ -222,9 +222,9 @@
             <div class="step-title"><small>ÉTAPE 2/3</small>
               <h3>Choisissez votre créneau</h3>
             </div>
-            <label>Date<input type="date" id="date" required></label>
-            <div class="slot-label">Créneaux disponibles</div>
-            <div class="slots" id="slots"></div>
+            <p class="availability-intro">Voici les prochains rendez-vous disponibles pour la formule choisie.</p>
+            <div class="slots availability-list" id="slots" aria-live="polite"></div>
+            <input type="hidden" id="date" required>
             <input type="hidden" id="time" required>
             <div class="form-actions"><button type="button" class="btn btn-secondary back-btn">← Retour</button><button
                 type="button" class="btn btn-primary next-btn">Continuer →</button></div>
