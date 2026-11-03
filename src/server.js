@@ -459,6 +459,70 @@ app.get('/api/email-status', adminGuard, asyncHandler(async (req, res) => {
   });
 }));
 
+app.get('/api/next-availability', availabilityRateLimit, asyncHandler(async (req, res) => {
+  const service = text(req.query.service || 'Essentielle', 30);
+  if (!SERVICES[service]) return res.status(400).json({ error: 'Prestation invalide.' });
+
+  const startDate = parisToday();
+  const horizonDays = 60;
+  const end = new Date(startDate + 'T12:00:00Z');
+  end.setUTCDate(end.getUTCDate() + horizonDays);
+  const endDate = end.toISOString().slice(0, 10);
+  const client = await pool.connect();
+
+  try {
+    // Charger le planning en une seule fois, puis calculer les créneaux côté serveur.
+    const bookings = await client.query(
+      'SELECT booking_date::text AS date, to_char(booking_time, \'HH24:MI\') AS time, service, duration_minutes AS duration ' +
+      'FROM bookings WHERE booking_date >= $1 AND booking_date <= $2 AND status = ANY($3::text[])',
+      [startDate, endDate, ACTIVE_STATUSES]
+    );
+    const blocks = await client.query(
+      'SELECT block_date::text AS date, to_char(block_time, \'HH24:MI\') AS time FROM booking_blocks ' +
+      'WHERE block_date >= $1 AND block_date <= $2',
+      [startDate, endDate]
+    );
+    const byDate = new Map();
+    for (const booking of bookings.rows) {
+      if (!byDate.has(booking.date)) byDate.set(booking.date, { bookings: [], blocks: [] });
+      byDate.get(booking.date).bookings.push({
+        start: slotMinutes(booking.time),
+        end: slotMinutes(booking.time) + Number(booking.duration) + BUFFER_MINUTES,
+        service: booking.service
+      });
+    }
+    for (const block of blocks.rows) {
+      if (!byDate.has(block.date)) byDate.set(block.date, { bookings: [], blocks: [] });
+      const start = slotMinutes(block.time);
+      byDate.get(block.date).blocks.push({ start, end: start + 60 });
+    }
+
+    const duration = SERVICES[service].durationMinutes + BUFFER_MINUTES;
+    const available = [];
+    for (let offset = 0; offset <= horizonDays && available.length < 8; offset++) {
+      const day = new Date(startDate + 'T12:00:00Z');
+      day.setUTCDate(day.getUTCDate() + offset);
+      const date = day.toISOString().slice(0, 10);
+      const daySchedule = byDate.get(date) || { bookings: [], blocks: [] };
+      const hasPremium = daySchedule.bookings.some(b => b.service === 'Premium');
+
+      for (const time of SLOT_RULES[service]) {
+        const start = slotMinutes(time);
+        if (date === startDate && start <= parisMinutesNow()) continue;
+        if (service === 'Premium' && hasPremium) continue;
+        const end = start + duration;
+        const overlapsBooking = daySchedule.bookings.some(b => start < b.end && end > b.start);
+        const overlapsBlock = daySchedule.blocks.some(b => start < b.end && end > b.start);
+        if (!overlapsBooking && !overlapsBlock) {
+          available.push({ date, time });
+          if (available.length >= 8) break;
+        }
+      }
+    }
+    res.json({ slots: available, horizonDays, hasMore: available.length === 8 });
+  } finally { client.release(); }
+}));
+
 app.get('/api/availability', availabilityRateLimit, asyncHandler(async (req, res) => {
   const date = text(req.query.date, 10);
   const service = text(req.query.service || 'Essentielle', 30);
