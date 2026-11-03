@@ -47,7 +47,7 @@ async function waitForHealth(timeoutMs = 12000) {
 
 function buildBookingForm(overrides = {}) {
   const fields = {
-    service: 'Entretien',
+    service: 'Essentielle',
     date: bookingDate,
     time: '09:00',
     firstName: 'Test',
@@ -136,15 +136,15 @@ test('a valid customer request is stored and queues two notifications', async ()
   });
   const payload = await response.json();
   assert.equal(response.status, 201, JSON.stringify(payload));
-  assert.equal(payload.booking.service, 'Entretien');
-  assert.equal(payload.booking.amount, 69);
+  assert.equal(payload.booking.service, 'Essentielle');
+  assert.equal(payload.booking.amount, 79);
   assert.equal(payload.booking.status, 'pending');
   firstBookingId = payload.booking.id;
 
   const stored = await pool.query('SELECT id, status, amount_eur FROM bookings WHERE id = $1', [firstBookingId]);
   assert.equal(stored.rowCount, 1);
   assert.equal(stored.rows[0].status, 'pending');
-  assert.equal(Number(stored.rows[0].amount_eur), 69);
+  assert.equal(Number(stored.rows[0].amount_eur), 79);
 
   const outbox = await pool.query(
     'SELECT recipient, dedupe_key FROM email_outbox WHERE booking_id = $1 ORDER BY dedupe_key',
@@ -159,10 +159,10 @@ test('availability exposes only the six selected start times and applies the one
   const response = await fetch(baseUrl + '/api/availability?date=' + bookingDate + '&service=' + encodeURIComponent('Entretien'));
   assert.equal(response.status, 200);
   const payload = await response.json();
-  assert.deepEqual(payload.slots.map(slot => slot.time), ['08:00', '09:00', '10:00', '12:00', '13:00', '14:00']);
+  assert.deepEqual(payload.slots.map(slot => slot.time), ['08:00', '09:00', '10:00', '13:00', '14:00', '15:00']);
   // The existing 09:00 Entretien booking occupies its estimated 2 hours plus 1 hour buffer.
   assert.equal(payload.slots.find(slot => slot.time === '10:00').available, false);
-  assert.equal(payload.slots.find(slot => slot.time === '12:00').available, true);
+  assert.equal(payload.slots.find(slot => slot.time === '13:00').available, true);
 });
 
 test('an overlapping booking request is rejected', async () => {
@@ -181,7 +181,7 @@ test('an overlapping booking request is rejected', async () => {
 test('malformed customer email is rejected without inserting a booking', async () => {
   const response = await fetch(baseUrl + '/api/bookings', {
     method: 'POST',
-    body: buildBookingForm({ time: '12:00', email: 'not-an-email' })
+    body: buildBookingForm({ time: '13:00', email: 'not-an-email' })
   });
   assert.equal(response.status, 400);
   assert.match((await response.json()).error, /e-mail/i);
@@ -211,20 +211,20 @@ test('manual payment requires customer agreement and records itemized receipt de
   const endpoint = baseUrl + '/api/admin/bookings/' + encodeURIComponent(firstBookingId) + '/payment';
   const headers = { 'x-admin-key': adminKey, 'content-type': 'application/json' };
   const missingAgreement = await fetch(endpoint, { method: 'POST', headers,
-    body: JSON.stringify({ service: 'Entretien', paymentMethod: 'cash', addons: [] }) });
+    body: JSON.stringify({ service: 'Essentielle', paymentMethod: 'cash', addons: [] }) });
   assert.equal(missingAgreement.status, 400);
   assert.match((await missingAgreement.json()).error, /accepté|accept/i);
   const response = await fetch(endpoint, { method: 'POST', headers, body: JSON.stringify({
-    service: 'Entretien', paymentMethod: 'cash', customerAgreed: true,
+    service: 'Essentielle', paymentMethod: 'cash', customerAgreed: true,
     addons: [{ name: 'Poils d’animaux', amount: 20 }, { name: 'Traitement des taches', amount: 15 }]
   }) });
   const payload = await response.json();
   assert.equal(response.status, 200, JSON.stringify(payload));
-  assert.equal(payload.totalAmount, 104);
+  assert.equal(payload.totalAmount, 114);
   assert.equal(payload.paymentMethod, 'cash');
   const stored = await pool.query('SELECT status, amount_eur, payment_method, payment_items, payment_agreed_at, paid_at FROM bookings WHERE id = $1', [firstBookingId]);
   assert.equal(stored.rows[0].status, 'confirmed');
-  assert.equal(Number(stored.rows[0].amount_eur), 104);
+  assert.equal(Number(stored.rows[0].amount_eur), 114);
   assert.equal(stored.rows[0].payment_method, 'cash');
   assert.equal(stored.rows[0].payment_items.length, 3);
   assert.ok(stored.rows[0].payment_agreed_at);
@@ -235,5 +235,5 @@ test('manual payment requires customer agreement and records itemized receipt de
   assert.equal(receipt.rows[0].recipient, 'client@example.test');
   assert.match(receipt.rows[0].subject, /reçu/i);
   assert.match(receipt.rows[0].html_body, /Poils d’animaux/);
-  assert.match(receipt.rows[0].html_body, /104 €/);
+  assert.match(receipt.rows[0].html_body, /114 €/);
 });
