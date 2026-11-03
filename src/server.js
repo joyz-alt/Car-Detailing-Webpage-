@@ -462,25 +462,37 @@ app.get('/api/email-status', adminGuard, asyncHandler(async (req, res) => {
 app.get('/api/next-availability', availabilityRateLimit, asyncHandler(async (req, res) => {
   const service = text(req.query.service || 'Essentielle', 30);
   if (!SERVICES[service]) return res.status(400).json({ error: 'Prestation invalide.' });
+  const requestedWeek = Number.parseInt(req.query.week || '0', 10);
+  if (!Number.isInteger(requestedWeek) || requestedWeek < 0 || requestedWeek > 7) {
+    return res.status(400).json({ error: 'Semaine invalide.' });
+  }
 
-  const startDate = parisToday();
-  const horizonDays = 60;
-  const end = new Date(startDate + 'T12:00:00Z');
-  end.setUTCDate(end.getUTCDate() + horizonDays);
-  const endDate = end.toISOString().slice(0, 10);
+  const today = parisToday();
+  const todayDate = new Date(today + 'T12:00:00Z');
+  const monday = new Date(todayDate);
+  const weekday = (monday.getUTCDay() + 6) % 7;
+  monday.setUTCDate(monday.getUTCDate() - weekday + requestedWeek * 7);
+  const weekStart = monday.toISOString().slice(0, 10);
+  const horizonDays = 45;
+  const horizonEnd = new Date(todayDate);
+  horizonEnd.setUTCDate(horizonEnd.getUTCDate() + horizonDays);
+  const horizonDate = horizonEnd.toISOString().slice(0, 10);
+  const sunday = new Date(monday);
+  sunday.setUTCDate(sunday.getUTCDate() + 6);
+  const weekEnd = sunday.toISOString().slice(0, 10);
+  const queryEnd = weekEnd < horizonDate ? weekEnd : horizonDate;
   const client = await pool.connect();
 
   try {
-    // Charger le planning en une seule fois, puis calculer les créneaux côté serveur.
     const bookings = await client.query(
       'SELECT booking_date::text AS date, to_char(booking_time, \'HH24:MI\') AS time, service, duration_minutes AS duration ' +
       'FROM bookings WHERE booking_date >= $1 AND booking_date <= $2 AND status = ANY($3::text[])',
-      [startDate, endDate, ACTIVE_STATUSES]
+      [weekStart, queryEnd, ACTIVE_STATUSES]
     );
     const blocks = await client.query(
       'SELECT block_date::text AS date, to_char(block_time, \'HH24:MI\') AS time FROM booking_blocks ' +
       'WHERE block_date >= $1 AND block_date <= $2',
-      [startDate, endDate]
+      [weekStart, queryEnd]
     );
     const byDate = new Map();
     for (const booking of bookings.rows) {
@@ -498,28 +510,34 @@ app.get('/api/next-availability', availabilityRateLimit, asyncHandler(async (req
     }
 
     const duration = SERVICES[service].durationMinutes + BUFFER_MINUTES;
-    const available = [];
-    for (let offset = 0; offset <= horizonDays && available.length < 8; offset++) {
-      const day = new Date(startDate + 'T12:00:00Z');
-      day.setUTCDate(day.getUTCDate() + offset);
-      const date = day.toISOString().slice(0, 10);
-      const daySchedule = byDate.get(date) || { bookings: [], blocks: [] };
-      const hasPremium = daySchedule.bookings.some(b => b.service === 'Premium');
-
+    const days = [];
+    for (let offset = 0; offset < 7; offset++) {
+      const dateObject = new Date(monday);
+      dateObject.setUTCDate(dateObject.getUTCDate() + offset);
+      const date = dateObject.toISOString().slice(0, 10);
+      if (date < today || date > horizonDate) continue;
+      const schedule = byDate.get(date) || { bookings: [], blocks: [] };
+      const hasPremium = schedule.bookings.some(booking => booking.service === 'Premium');
+      const slots = [];
       for (const time of SLOT_RULES[service]) {
         const start = slotMinutes(time);
-        if (date === startDate && start <= parisMinutesNow()) continue;
+        if (date === today && start <= parisMinutesNow()) continue;
         if (service === 'Premium' && hasPremium) continue;
         const end = start + duration;
-        const overlapsBooking = daySchedule.bookings.some(b => start < b.end && end > b.start);
-        const overlapsBlock = daySchedule.blocks.some(b => start < b.end && end > b.start);
-        if (!overlapsBooking && !overlapsBlock) {
-          available.push({ date, time });
-          if (available.length >= 8) break;
-        }
+        const overlapsBooking = schedule.bookings.some(booking => start < booking.end && end > booking.start);
+        const overlapsBlock = schedule.blocks.some(block => start < block.end && end > block.start);
+        if (!overlapsBooking && !overlapsBlock) slots.push({ date, time });
       }
+      days.push({ date, slots });
     }
-    res.json({ slots: available, horizonDays, hasMore: available.length === 8 });
+
+    const weekLabel = days.length
+      ? new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'long' }).format(new Date(days[0].date + 'T12:00:00Z')) +
+        ' – ' + new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(days[days.length - 1].date + 'T12:00:00Z'))
+      : 'Aucune date disponible';
+    const hasNextWeek = weekStart < horizonDate && requestedWeek < 7 &&
+      new Date(weekStart + 'T12:00:00Z').getTime() + 7 * 86400000 <= new Date(horizonDate + 'T12:00:00Z').getTime();
+    res.json({ days, weekLabel, week: requestedWeek, horizonDays, hasNextWeek });
   } finally { client.release(); }
 }));
 
