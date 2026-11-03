@@ -21,9 +21,8 @@ const MAX_PHOTOS = 5;
 const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
 const ACTIVE_STATUSES = ['pending', 'confirmed'];
 const SERVICES = {
-  Entretien: { amount: 69, durationMinutes: 120, durationLabel: '1h30 à 2h' },
-  'Nettoyage complet': { amount: 109, durationMinutes: 180, durationLabel: '2h30 à 3h30' },
-  'Rénovation intérieure': { amount: 149, durationMinutes: 270, durationLabel: '4h à 5h' }
+  Essentielle: { amount: 79, durationMinutes: 120, durationLabel: '1h30 à 2h' },
+  Premium: { amount: 129, durationMinutes: 210, durationLabel: '3h à 4h' }
 };
 const SLOTS = ['08:00', '09:00', '10:00', '12:00', '13:00', '14:00'];
 const BUFFER_MINUTES = 60;
