@@ -52,43 +52,44 @@ function validateStep(step) {
 }
 
 async function loadSlots() {
-  const date = $('#date').value;
   const box = $('#slots');
-  if (!date) return;
-  box.innerHTML = '<span class="empty-slot">Chargement…</span>';
+  box.innerHTML = '<span class="empty-slot">Recherche des prochains rendez-vous…</span>';
+  $('#date').value = '';
   $('#time').value = '';
 
   try {
-    const r = await fetch(`/api/availability?date=${encodeURIComponent(date)}&service=${encodeURIComponent(selectedService())}`);
+    const r = await fetch(`/api/next-availability?service=${encodeURIComponent(selectedService())}`);
     const data = await r.json();
     if (!r.ok) throw new Error(data.error || 'Erreur');
-    slots = data.slots || [];
+    const upcoming = data.slots || [];
     box.innerHTML = '';
 
-    if (!slots.length) {
-      box.innerHTML = '<span class="empty-slot">Aucun créneau disponible pour cette date.</span>';
+    if (!upcoming.length) {
+      box.innerHTML = '<span class="empty-slot">Aucun rendez-vous disponible dans les 60 prochains jours. Contactez-nous pour étudier une autre possibilité.</span>';
       return;
     }
 
-    slots.forEach(s => {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'slot' + (!s.available ? ' disabled' : '');
-      b.textContent = s.time;
-      b.title = s.available ? 'Choisir ce créneau' : 'Créneau indisponible';
-      if (s.available) {
-        b.onclick = () => {
-          $$('.slot').forEach(x => x.classList.remove('selected'));
-          b.classList.add('selected');
-          $('#time').value = s.time;
-        };
-      } else {
-        b.disabled = true;
-      }
-      box.appendChild(b);
+    upcoming.forEach(slot => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'slot availability-card';
+      const dateLabel = new Date(slot.date + 'T12:00:00').toLocaleDateString('fr-FR', {
+        weekday: 'long', day: 'numeric', month: 'long'
+      });
+      const date = dateLabel.charAt(0).toUpperCase() + dateLabel.slice(1);
+      button.innerHTML = `<span class="availability-date">${date}</span><strong class="availability-time">${slot.time}</strong>`;
+      button.setAttribute('aria-label', `${date} à ${slot.time}`);
+      button.onclick = () => {
+        $$('.availability-card').forEach(item => item.classList.remove('selected'));
+        button.classList.add('selected');
+        $('#date').value = slot.date;
+        $('#time').value = slot.time;
+        updateEarlyExecutionConsent();
+      };
+      box.appendChild(button);
     });
   } catch (err) {
-    box.innerHTML = '<span class="empty-slot">Impossible de charger les disponibilités.</span>';
+    box.innerHTML = '<span class="empty-slot">Impossible de charger les prochains rendez-vous. Veuillez réessayer.</span>';
   }
 }
 
@@ -289,8 +290,7 @@ function init() {
   });
 
   $('#service')?.addEventListener('change', loadSlots);
-  $('#date')?.addEventListener('change', () => { loadSlots(); updateEarlyExecutionConsent(); });
-  $('#photos')?.addEventListener('change', handlePhotoSelection);
+    $('#photos')?.addEventListener('change', handlePhotoSelection);
   renderPhotoList();
   $$('.next-btn').forEach(b => b.addEventListener('click', () => goStep(current + 1)));
   $$('.back-btn').forEach(b => b.addEventListener('click', () => goStep(current - 1)));
