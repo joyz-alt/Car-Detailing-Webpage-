@@ -2415,3 +2415,46 @@ body {
     line-height: 1.35;
   }
 }
+
+
+/* Upcoming appointment picker */
+.availability-intro {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+  margin: 0 0 14px;
+}
+.availability-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  max-height: 360px;
+  overflow-y: auto;
+  padding: 2px;
+}
+.availability-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 58px;
+  text-align: left;
+  border-radius: 6px;
+}
+.availability-date {
+  color: #d9dce0;
+  font-size: 12px;
+  line-height: 1.4;
+  text-transform: capitalize;
+}
+.availability-time {
+  color: var(--accent);
+  font-size: 15px;
+  white-space: nowrap;
+}
+.availability-card.selected .availability-date {
+  color: var(--accent);
+}
+@media (max-width: 520px) {
+  .availability-list { grid-template-columns: 1fr; }
+}
