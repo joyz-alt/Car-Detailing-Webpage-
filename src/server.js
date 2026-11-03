@@ -269,9 +269,9 @@ async function processEmailQueue() {
 }
 
 async function ensureEmailOutboxSchema() {
-  // Keep legacy booking labels readable while allowing the three current packages.
+  // Keep legacy booking labels readable while allowing the two current packages.
   await pool.query('ALTER TABLE bookings DROP CONSTRAINT IF EXISTS bookings_service_check');
-  await pool.query("ALTER TABLE bookings ADD CONSTRAINT bookings_service_check CHECK (service IN ('Essentiel', 'Intégral', 'Entretien', 'Nettoyage complet', 'Rénovation intérieure'))");
+  await pool.query("ALTER TABLE bookings ADD CONSTRAINT bookings_service_check CHECK (service IN ('Essentiel', 'Intégral', 'Entretien', 'Nettoyage complet', 'Rénovation intérieure', 'Essentielle', 'Premium'))");
   await pool.query("ALTER TABLE bookings ADD COLUMN IF NOT EXISTS payment_items JSONB NOT NULL DEFAULT '[]'::jsonb");
   await pool.query('ALTER TABLE bookings ADD COLUMN IF NOT EXISTS payment_method TEXT');
   await pool.query('ALTER TABLE bookings ADD COLUMN IF NOT EXISTS payment_agreed_at TIMESTAMPTZ');
