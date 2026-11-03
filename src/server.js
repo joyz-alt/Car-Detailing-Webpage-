@@ -21,11 +21,15 @@ const MAX_PHOTOS = 5;
 const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
 const ACTIVE_STATUSES = ['pending', 'confirmed'];
 const SERVICES = {
-  Essentielle: { amount: 79, durationMinutes: 120, durationLabel: '1h30 à 2h' },
-  Premium: { amount: 129, durationMinutes: 210, durationLabel: '3h à 4h' }
+  Essentielle: { amount: 79, durationMinutes: 120, durationLabel: '2h30 (marge comprise)' },
+  Premium: { amount: 129, durationMinutes: 210, durationLabel: '4h30 (marge comprise)' }
 };
-const SLOTS = ['08:00', '09:00', '10:00', '12:00', '13:00', '14:00'];
-const BUFFER_MINUTES = 60;
+const SLOT_RULES = {
+  Essentielle: ['08:00', '09:00', '10:00', '13:00', '14:00', '15:00'],
+  Premium: ['08:00', '09:00', '13:00', '14:00']
+};
+const SLOTS = [...new Set(Object.values(SLOT_RULES).flat())].sort();
+const BUFFER_MINUTES = 30;
 const SERVICE_AREA_CENTER = { lat: 45.64889, lon: 0.17426 }; // Marché Victor Hugo, Angoulême
 const SERVICE_AREA_RADIUS_KM = 25;
 function haversineKm(a, b) {
@@ -377,10 +381,19 @@ async function photoList(bookingId) {
   );
   return Promise.all(result.rows.map(async p => ({ id: p.id, name: p.name, type: p.type, url: await signPhoto(p.objectKey) })));
 }
-async function isAvailableInTransaction(client, date, time, service) {
+async function isSlotAvailable(client, date, time, service) {
+  if (!SERVICES[service] || !SLOT_RULES[service].includes(time)) return false;
+
+  // Une seule Premium par jour, matin OU après-midi.
+  if (service === 'Premium') {
+    const premium = await client.query(
+      'SELECT 1 FROM bookings WHERE booking_date = $1 AND status = ANY($2::text[]) AND service = $3 LIMIT 1',
+      [date, ACTIVE_STATUSES, 'Premium']
+    );
+    if (premium.rowCount) return false;
+  }
+
   const duration = SERVICES[service].durationMinutes + BUFFER_MINUTES;
-  // Lock each day's schedule so simultaneous requests cannot both reserve the same slot.
-  await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [date]);
   const booked = await client.query(
     'SELECT 1 FROM bookings WHERE booking_date = $1 AND status = ANY($2::text[]) ' +
     'AND booking_time < ($3::time + ($4 * interval \'1 minute\')) ' +
@@ -388,6 +401,7 @@ async function isAvailableInTransaction(client, date, time, service) {
     [date, ACTIVE_STATUSES, time, duration]
   );
   if (booked.rowCount) return false;
+
   const blocked = await client.query(
     'SELECT 1 FROM booking_blocks WHERE block_date = $1 ' +
     'AND block_time < ($2::time + ($3 * interval \'1 minute\')) ' +
@@ -395,6 +409,12 @@ async function isAvailableInTransaction(client, date, time, service) {
     [date, time, duration]
   );
   return blocked.rowCount === 0;
+}
+
+async function isAvailableInTransaction(client, date, time, service) {
+  // Verrouiller la journée pour éviter deux réservations simultanées incompatibles.
+  await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [date]);
+  return isSlotAvailable(client, date, time, service);
 }
 
 app.use(express.json({ limit: '1mb' }));
@@ -441,7 +461,7 @@ app.get('/api/email-status', adminGuard, asyncHandler(async (req, res) => {
 
 app.get('/api/availability', availabilityRateLimit, asyncHandler(async (req, res) => {
   const date = text(req.query.date, 10);
-  const service = text(req.query.service || 'Entretien', 30);
+  const service = text(req.query.service || 'Essentielle', 30);
   if (!isValidDate(date)) return res.status(400).json({ error: 'Date invalide.' });
   if (date < parisToday()) return res.status(400).json({ error: 'La date doit être aujourd’hui ou dans le futur.' });
   if (!SERVICES[service]) return res.status(400).json({ error: 'Prestation invalide.' });
@@ -449,22 +469,10 @@ app.get('/api/availability', availabilityRateLimit, asyncHandler(async (req, res
   const client = await pool.connect();
   try {
     const slots = [];
-    for (const time of SLOTS) {
-      const duration = SERVICES[service].durationMinutes + BUFFER_MINUTES;
-      const booked = await client.query(
-        'SELECT 1 FROM bookings WHERE booking_date = $1 AND status = ANY($2::text[]) ' +
-        'AND booking_time < ($3::time + ($4 * interval \'1 minute\')) ' +
-        'AND booking_time + (duration_minutes + ' + BUFFER_MINUTES + ') * interval \'1 minute\' > $3::time LIMIT 1',
-        [date, ACTIVE_STATUSES, time, duration]
-      );
-      const blocked = await client.query(
-        'SELECT 1 FROM booking_blocks WHERE block_date = $1 ' +
-        'AND block_time < ($2::time + ($3 * interval \'1 minute\')) ' +
-        'AND block_time + interval \'1 hour\' > $2::time LIMIT 1',
-        [date, time, duration]
-      );
+    for (const time of SLOT_RULES[service]) {
       const isPast = date === parisToday() && slotMinutes(time) <= parisMinutesNow();
-      slots.push({ time, available: !isPast && booked.rowCount === 0 && blocked.rowCount === 0 });
+      const available = !isPast && await isSlotAvailable(client, date, time, service);
+      slots.push({ time, available });
     }
     res.json({ slots });
   } finally { client.release(); }
@@ -501,7 +509,7 @@ app.post('/api/bookings', bookingRateLimit, (req, res, next) => {
   }
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'Adresse e-mail invalide.' });
   if (!isValidDate(date) || date < parisToday()) return res.status(400).json({ error: 'La date de réservation est invalide.' });
-  if (!SLOTS.includes(time)) return res.status(400).json({ error: 'Créneau invalide.' });
+  if (!SLOT_RULES[service].includes(time)) return res.status(400).json({ error: 'Ce créneau n’est pas proposé pour cette formule.' });
   if (date === parisToday() && slotMinutes(time) <= parisMinutesNow()) return res.status(400).json({ error: 'Ce créneau est déjà passé.' });
   const withdrawalDeadline = new Date(parisToday() + 'T00:00:00Z');
   withdrawalDeadline.setUTCDate(withdrawalDeadline.getUTCDate() + 14);
