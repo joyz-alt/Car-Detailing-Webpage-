@@ -2458,3 +2458,72 @@ body {
 @media (max-width: 520px) {
   .availability-list { grid-template-columns: 1fr; }
 }
+
+
+/* Two fixed service cards: no carousel controls or horizontal scrolling. */
+.service-track {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-flow: row;
+  grid-auto-columns: auto;
+  overflow: visible;
+  scroll-snap-type: none;
+}
+.service-track .service-card { scroll-snap-align: none; }
+@media (max-width: 800px) {
+  .service-track { grid-template-columns: 1fr; padding-left: 0; padding-right: 0; }
+}
+
+/* Week-by-week booking calendar */
+.availability-week-nav {
+  display: grid;
+  grid-template-columns: 42px 1fr 42px;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 14px;
+}
+.availability-week-nav strong { text-align: center; font-size: 14px; color: var(--text); text-transform: capitalize; }
+.availability-week-nav .btn { min-width: 42px; padding: 9px; }
+.availability-week-nav .btn:disabled { opacity: .3; cursor: default; }
+.availability-week {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.availability-day {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255,255,255,.02);
+}
+.availability-day h4 {
+  margin: 0 0 10px;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+.availability-times { display: flex; flex-wrap: wrap; gap: 7px; }
+.availability-time-button {
+  min-width: 58px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--text);
+  background: #15181d;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.availability-time-button:hover,
+.availability-time-button.selected {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(184,154,106,.1);
+}
+.availability-full { color: var(--muted); font-size: 12px; }
+.availability-day.is-full { opacity: .65; }
+@media (max-width: 520px) {
+  .availability-week { grid-template-columns: 1fr; }
+}
