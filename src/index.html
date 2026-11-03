@@ -111,15 +111,6 @@
             </ul>
             <button class="service-cta" data-service="Premium">Choisir Premium →</button>
           </article>
-          <div class="service-carousel-controls">
-            <button type="button" class="service-arrow" id="servicePrev" aria-label="Formule précédente">←</button>
-            <div class="service-dots" aria-label="Choisir une formule">
-              <button type="button" class="service-dot active" aria-label="Formule Essentielle" aria-current="true"></button>
-              <button type="button" class="service-dot" aria-label="Formule Premium"></button>
-            </div>
-            <button type="button" class="service-arrow" id="serviceNext" aria-label="Formule suivante">→</button>
-          </div>
-          <p class="service-carousel-hint">Faites glisser pour comparer les formules</p>
         </div>
         <p class="fine-print">Durées indicatives. L'injection-extraction est réalisée sur les textiles compatibles et selon leur état. Les taches très incrustées, poils d’animaux importants ou véhicules fortement encrassés peuvent nécessiter un devis adapté, toujours validé avec vous avant intervention.</p>
       </div>
@@ -222,8 +213,13 @@
             <div class="step-title"><small>ÉTAPE 2/3</small>
               <h3>Choisissez votre créneau</h3>
             </div>
-            <p class="availability-intro">Voici les prochains rendez-vous disponibles pour la formule choisie.</p>
-            <div class="slots availability-list" id="slots" aria-live="polite"></div>
+            <p class="availability-intro">Consultez les disponibilités semaine par semaine. Vous pouvez réserver jusqu’à 45 jours à l’avance.</p>
+            <div class="availability-week-nav">
+              <button type="button" class="btn btn-secondary" id="weekPrev" aria-label="Semaine précédente">←</button>
+              <strong id="weekLabel" aria-live="polite">Chargement…</strong>
+              <button type="button" class="btn btn-secondary" id="weekNext" aria-label="Semaine suivante">→</button>
+            </div>
+            <div class="availability-week" id="slots" aria-live="polite"></div>
             <input type="hidden" id="date" required>
             <input type="hidden" id="time" required>
             <div class="form-actions"><button type="button" class="btn btn-secondary back-btn">← Retour</button><button
