@@ -155,12 +155,12 @@ test('a valid customer request is stored and queues two notifications', async ()
   assert.ok(outbox.rows.some(row => row.recipient === 'client@example.test'));
 });
 
-test('availability exposes only the six selected start times and applies the one-hour buffer', async () => {
-  const response = await fetch(baseUrl + '/api/availability?date=' + bookingDate + '&service=' + encodeURIComponent('Entretien'));
+test('availability exposes only the six selected start times and applies the 30-minute buffer', async () => {
+  const response = await fetch(baseUrl + '/api/availability?date=' + bookingDate + '&service=' + encodeURIComponent('Essentielle'));
   assert.equal(response.status, 200);
   const payload = await response.json();
   assert.deepEqual(payload.slots.map(slot => slot.time), ['08:00', '09:00', '10:00', '13:00', '14:00', '15:00']);
-  // The existing 09:00 Entretien booking occupies its estimated 2 hours plus 1 hour buffer.
+  // The existing 09:00 Essentielle booking occupies its estimated 2 hours plus 30-minute buffer.
   assert.equal(payload.slots.find(slot => slot.time === '10:00').available, false);
   assert.equal(payload.slots.find(slot => slot.time === '13:00').available, true);
 });
