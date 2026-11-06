@@ -206,9 +206,9 @@ async function sendPayment(id, button) {
   const addons = [];
   for (const line of addonText.split(/\r?\n/).map(value => value.trim()).filter(Boolean)) {
     const separator = line.lastIndexOf('|');
-    if (separator < 1) return showToast('Format invalide. Utilisez : intitulé | prix en euros.');
+    if (separator < 1) return showToast('Format invalide. Utilisez : intitulé | prix en euros.', 'error');
     const name = line.slice(0, separator).trim(), amountText = line.slice(separator + 1).trim();
-    if (!name || !/^\d+$/.test(amountText)) return showToast('Chaque supplément doit avoir un intitulé et un prix entier en euros.');
+    if (!name || !/^\d+$/.test(amountText)) return showToast('Chaque supplément doit avoir un intitulé et un prix entier en euros.', 'error');
     addons.push({ name, amount: Number(amountText) });
   }
   const methodLabel = paymentMethod === 'card' ? 'carte bancaire' : 'espèces';
@@ -245,7 +245,7 @@ async function deleteBooking(id) {
     ALL_BOOKINGS = ALL_BOOKINGS.filter(item => item.id !== id);
     applyBookingFilters();
     showToast('Réservation supprimée.');
-  } catch (e) { showToast(e.message); }
+  } catch (e) { showToast(e.message, 'error'); }
 }
 $('#bookings').addEventListener('click', async event => {
   const button = event.target.closest('button[data-action]');
@@ -261,7 +261,7 @@ $('#bookings').addEventListener('click', async event => {
   if (action === 'decline') {
     if (!await showConfirm('Refuser cette demande ?')) return;
     try { await api('/api/admin/bookings/' + encodeURIComponent(id) + '/decline', { method: 'POST' }); await render(); }
-    catch (e) { showToast(e.message); }
+    catch (e) { showToast(e.message, 'error'); }
   }
   if (action === 'cancel-edit') {
     const row = button.closest('.booking-detail-row');
@@ -270,12 +270,12 @@ $('#bookings').addEventListener('click', async event => {
   }
   if (action === 'remove-block') {
     try { await api('/api/admin/blocks/' + encodeURIComponent(id), { method: 'DELETE' }); await renderBlocks(await api('/api/admin/blocks')); }
-    catch (e) { showToast(e.message); }
+    catch (e) { showToast(e.message, 'error'); }
   }
   if (action === 'retry-email') {
     button.disabled = true;
     try { await api('/api/admin/email-outbox/' + encodeURIComponent(id) + '/retry', { method: 'POST' }); await renderNotifications(); }
-    catch (e) { showToast(e.message); button.disabled = false; }
+    catch (e) { showToast(e.message, 'error'); button.disabled = false; }
   }
 });
 $('#bookings').addEventListener('submit', event => {
@@ -292,7 +292,7 @@ $('#emailOutbox').addEventListener('click', async event => {
     await api('/api/admin/email-outbox/' + encodeURIComponent(button.dataset.id) + '/retry', { method: 'POST' });
     await renderNotifications();
   } catch (e) {
-    showToast(e.message);
+    showToast(e.message, 'error');
     button.disabled = false;
   }
 });
@@ -300,14 +300,14 @@ $('#blocks').addEventListener('click', async event => {
   const button = event.target.closest('button[data-action="remove-block"]');
   if (!button) return;
   try { await api('/api/admin/blocks/' + encodeURIComponent(button.dataset.id), { method: 'DELETE' }); await renderBlocks(await api('/api/admin/blocks')); }
-  catch (e) { showToast(e.message); }
+  catch (e) { showToast(e.message, 'error'); }
 });
 $('#blockDate').min = new Date().toISOString().slice(0, 10);
 $('#blockBtn').onclick = async () => {
   const date = $('#blockDate').value, time = $('#blockTime').value;
   if (!date) return showToast('Choisissez une date.', 'error');
   try { await api('/api/admin/blocks', { method: 'POST', body: JSON.stringify({ date, time }) }); await renderBlocks(await api('/api/admin/blocks')); }
-  catch (e) { showToast(e.message); }
+  catch (e) { showToast(e.message, 'error'); }
 };
 $('#clearBtn').onclick = () => render();
 $('#refreshEmails').onclick = () => renderNotifications();
