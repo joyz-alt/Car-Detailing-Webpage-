@@ -789,6 +789,45 @@ app.delete('/api/admin/blocks/:id', adminGuard, asyncHandler(async (req, res) =>
 }));
 
 
+
+app.post('/api/admin/bookings', adminGuard, asyncHandler(async (req, res) => {
+  const body = req.body || {}, service = text(body.service, 30), date = text(body.date, 10), time = text(body.time, 5);
+  const firstName = text(body.firstName, 100) || 'Non renseigné', lastName = text(body.lastName, 100) || 'Non renseigné';
+  const phone = text(body.phone, 40) || 'Non renseigné', email = text(body.email, 254).toLowerCase();
+  const address = text(body.address, 300) || 'Non renseignée', vehicle = text(body.vehicle, 100) || 'Non renseigné';
+  const water = text(body.water, 10) || 'Non renseigné', electricity = text(body.electricity, 10) || 'Non renseigné';
+  const condition = text(body.condition, 100) || 'Non renseigné', note = text(body.note, 1500);
+  if (!SERVICES[service]) return res.status(400).json({ error: 'Choisissez une formule valide.' });
+  if (!isValidDate(date) || date < parisToday() || !SLOTS.includes(time)) return res.status(400).json({ error: 'Choisissez une date future et un horaire valide.' });
+  if (date === parisToday() && slotMinutes(time) <= parisMinutesNow()) return res.status(400).json({ error: 'Cet horaire est déjà passé.' });
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'Adresse e-mail invalide.' });
+  const id = makeId(), details = SERVICES[service], client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [date]);
+    if (service === 'Premium') {
+      const premium = await client.query('SELECT 1 FROM bookings WHERE booking_date = $1 AND status = ANY($2::text[]) AND service = $3 LIMIT 1', [date, ACTIVE_STATUSES, 'Premium']);
+      if (premium.rowCount) { await client.query('ROLLBACK'); return res.status(409).json({ error: 'Une autre prestation Premium est déjà prévue ce jour-là.' }); }
+    }
+    const duration = details.durationMinutes + BUFFER_MINUTES;
+    const overlap = await client.query(
+      'SELECT 1 FROM bookings WHERE booking_date = $1 AND status = ANY($2::text[]) AND booking_time < ($3::time + ($4 * interval \'1 minute\')) ' +
+      'AND booking_time + (duration_minutes + ' + BUFFER_MINUTES + ') * interval \'1 minute\' > $3::time LIMIT 1',
+      [date, ACTIVE_STATUSES, time, duration]);
+    const blocked = await client.query(
+      'SELECT 1 FROM booking_blocks WHERE block_date = $1 AND block_time < ($2::time + ($3 * interval \'1 minute\')) AND block_time + interval \'1 hour\' > $2::time LIMIT 1',
+      [date, time, duration]);
+    if (overlap.rowCount || blocked.rowCount) { await client.query('ROLLBACK'); return res.status(409).json({ error: 'Ce créneau chevauche une autre réservation ou un créneau bloqué.' }); }
+    await client.query(
+      'INSERT INTO bookings (id, service, vehicle, booking_date, booking_time, first_name, last_name, phone, email, address, water, electricity, vehicle_condition, note, amount_eur, duration_minutes, duration_label, status) ' +
+      "VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,'pending')",
+      [id, service, vehicle, date, time, firstName, lastName, phone, email, address, water, electricity, condition, note, details.amount, details.durationMinutes, details.durationLabel]);
+    await client.query('COMMIT');
+  } catch (e) { await client.query('ROLLBACK').catch(() => {}); throw e; }
+  finally { client.release(); }
+  res.status(201).json({ ok: true, booking: { id, service, vehicle, date, time, firstName, lastName, phone, email, address, amount: details.amount, status: 'pending' } });
+}));
+
 app.patch('/api/admin/bookings/:id', adminGuard, asyncHandler(async (req, res) => {
   const body = req.body || {};
   const client = await pool.connect();
@@ -824,9 +863,9 @@ app.patch('/api/admin/bookings/:id', adminGuard, asyncHandler(async (req, res) =
       await client.query('ROLLBACK');
       return res.status(400).json({ error: 'La date ou l’heure ne correspond pas à un créneau proposé pour cette formule.' });
     }
-    if (!firstName || !lastName || !phone || !address || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       await client.query('ROLLBACK');
-      return res.status(400).json({ error: 'Vérifiez le prénom, le nom, le téléphone, l’adresse et l’e-mail.' });
+      return res.status(400).json({ error: 'Vérifiez l’adresse e-mail.' });
     }
     if (booking.status === 'confirmed' && service !== booking.service) {
       await client.query('ROLLBACK');
@@ -1009,22 +1048,24 @@ app.post('/api/admin/bookings/:id/payment', adminGuard, asyncHandler(async (req,
     if (!updated.rowCount) { await client.query('ROLLBACK'); return res.status(409).json({ error: 'Le statut de la réservation a changé. Actualisez la page.' }); }
     const itemSummary = paymentItems.map(item => '<li>' + escapeHtml(item.name) + ' : <strong>' + escapeHtml(item.amount) + ' €</strong></li>').join('');
     const methodLabel = paymentMethod === 'card' ? 'Carte bancaire' : 'Espèces';
-    await enqueueEmail(client, {
-      dedupeKey: 'booking:' + booking.id + ':receipt', bookingId: booking.id, recipient: booking.email,
-      subject: 'Épure Auto — reçu de votre prestation',
-      htmlBody: '<p>Bonjour ' + escapeHtml(booking.firstName) + ',</p>' +
-        '<p>Merci pour votre confiance. Nous confirmons que votre règlement a été reçu après la prestation.</p>' +
-        '<p><strong>Véhicule :</strong> ' + escapeHtml(booking.vehicle) + '<br><strong>Date :</strong> ' + escapeHtml(booking.date) + ' à ' + escapeHtml(booking.time) +
-        '<br><strong>Mode de règlement :</strong> ' + methodLabel + '</p><ul>' + itemSummary + '</ul>' +
-        '<p><strong>Total réglé : ' + escapeHtml(totalAmount) + ' €</strong></p>' +
-        '<p>Ce courriel récapitule le règlement enregistré par Épure Auto. Conservez-le pour vos dossiers.</p><p>À bientôt,<br>Épure Auto</p>'
-    });
+    if (booking.email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(booking.email)) {
+  await enqueueEmail(client, {
+    dedupeKey: 'booking:' + booking.id + ':receipt', bookingId: booking.id, recipient: booking.email,
+    subject: 'Épure Auto — reçu de votre prestation',
+    htmlBody: '<p>Bonjour ' + escapeHtml(booking.firstName) + ',</p>' +
+      '<p>Merci pour votre confiance. Nous confirmons que votre règlement a été reçu après la prestation.</p>' +
+      '<p><strong>Véhicule :</strong> ' + escapeHtml(booking.vehicle) + '<br><strong>Date :</strong> ' + escapeHtml(booking.date) + ' à ' + escapeHtml(booking.time) +
+      '<br><strong>Mode de règlement :</strong> ' + methodLabel + '</p><ul>' + itemSummary + '</ul>' +
+      '<p><strong>Total réglé : ' + escapeHtml(totalAmount) + ' €</strong></p>' +
+      '<p>Ce courriel récapitule le règlement enregistré par Épure Auto. Conservez-le pour vos dossiers.</p><p>À bientôt,<br>Épure Auto</p>'
+  });
+    }
     await client.query('COMMIT');
   } catch (e) { await client.query('ROLLBACK').catch(() => { }); throw e; }
   finally { client.release(); }
-  void processEmailQueue().catch(e => console.error('[EMAIL RECEIPT QUEUE]', e.message));
+  if (booking.email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(booking.email)) void processEmailQueue().catch(e => console.error('[EMAIL RECEIPT QUEUE]', e.message));
   const emailResult = await pool.query('SELECT status FROM email_outbox WHERE dedupe_key = $1', ['booking:' + booking.id + ':receipt']);
-  const emailStatus = emailResult.rows[0] ? emailResult.rows[0].status : 'pending';
+  const emailStatus = emailResult.rows[0] ? emailResult.rows[0].status : 'not_applicable';
   res.json({ ok: true, totalAmount, paymentMethod, emailSent: emailStatus === 'sent', emailStatus });
 }));
 
