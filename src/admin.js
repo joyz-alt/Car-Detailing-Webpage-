@@ -38,7 +38,7 @@ $('#adminDialogForm').addEventListener('submit', event => {
 });
 $('#adminDialogCancel').addEventListener('click', () => closeDialog(false));
 $('#adminDialog').addEventListener('click', event => { if (event.target === $('#adminDialog')) closeDialog(false); });
-document.addEventListener('keydown', event => { if (event.key !== 'Escape') return; if (!$('#adminDialog').hidden) closeDialog(false); else if (blockModal && !blockModal.hidden) closeBlockPeriod(); else if (manualModal && !manualModal.hidden) closeManualBooking(); });
+document.addEventListener('keydown', event => { if (event.key !== 'Escape') return; if (!$('#adminDialog').hidden) closeDialog(false); else if (blockModal && !blockModal.hidden) closeBlockPeriod(); else if (manualModal && !manualModal.hidden) closeManualBooking(); else if (bookingsModal && !bookingsModal.hidden) closePanelModal(bookingsModal); else if (notificationsModal && !notificationsModal.hidden) closePanelModal(notificationsModal); });
 
 function headers(json = false) {
   const h = {};
@@ -187,6 +187,7 @@ async function render() {
   try { ALL_BLOCKS = await api('/api/admin/blocks'); renderBlocks(ALL_BLOCKS); renderCalendar(); }
   catch (e) { $('#blocks').innerHTML = '<li class="empty">' + escapeHtml(e.message) + '</li>'; }
   await renderNotifications();
+  renderDashboardOverview();
 }
 function renderBlocks(rows) {
   const box = $('#blocks');
@@ -222,9 +223,34 @@ $('#calendarNext').addEventListener('click',()=>{CALENDAR_MONTH=new Date(CALENDA
 $('#calendarToday').addEventListener('click',()=>{CALENDAR_MONTH=new Date(new Date().getFullYear(),new Date().getMonth(),1);renderCalendar();});
 $('#adminCalendar').addEventListener('click',event=>{
   const day=event.target.closest('[data-calendar-date]');if(!day)return;
-  $('#blockDate').value=day.dataset.calendarDate;$('#blockDate').focus();
-  showToast('Date sélectionnée : '+formatBookingDate(day.dataset.calendarDate)+'.');
+  renderDashboardOverview(day.dataset.calendarDate);
 });
+$('#resetAgenda').addEventListener('click',()=>renderDashboardOverview());
+function renderDashboardOverview(selectedDate = null) {
+  const today = calendarDateKey(new Date());
+  const active = ALL_BOOKINGS.filter(b => b.status !== 'declined');
+  const upcoming = active.filter(b => b.date >= today).sort((a,b) => (a.date+a.time).localeCompare(b.date+b.time));
+  const pending = ALL_BOOKINGS.filter(b => b.status === 'pending').length;
+  const monthKey = today.slice(0,7);
+  const revenue = ALL_BOOKINGS.filter(b => b.status === 'confirmed' && b.date.startsWith(monthKey))
+    .reduce((sum,b) => sum + Number(b.amount || SERVICE_PRICES[b.service] || 0), 0);
+  const futureBlocks = ALL_BLOCKS.filter(b => b.date >= today).length;
+  $('#statUpcoming').textContent = upcoming.length;
+  $('#statUpcomingHint').textContent = upcoming.length ? 'Prochaine : ' + formatBookingDate(upcoming[0].date) : 'Aucun rendez-vous prévu';
+  $('#statPending').textContent = pending;
+  $('#statRevenue').textContent = revenue.toLocaleString('fr-FR',{style:'currency',currency:'EUR',maximumFractionDigits:0});
+  $('#statBlocks').textContent = futureBlocks;
+  const agenda = $('#upcomingAgenda');
+  const rows = selectedDate ? active.filter(b => b.date === selectedDate).sort((a,b)=>a.time.localeCompare(b.time)) : upcoming.slice(0,7);
+  $('#agendaTitle').textContent = selectedDate ? 'Prestations du ' + formatBookingDate(selectedDate) : 'Prochaines prestations';
+  if (!rows.length) {
+    agenda.innerHTML = '<div class="agenda-empty"><span>✓</span><strong>'+(selectedDate?'Aucune prestation ce jour-là':'Aucune prestation à venir')+'</strong><p class="empty">'+(selectedDate?'Choisissez une autre date dans le calendrier.':'Les prochains rendez-vous apparaîtront ici.')+'</p></div>';
+  } else {
+    agenda.innerHTML = rows.map(b => '<article class="agenda-item"><div class="agenda-date"><strong>'+escapeHtml(b.time)+'</strong><span>'+escapeHtml(formatBookingDate(b.date))+'</span></div><div class="agenda-details"><strong>'+escapeHtml([b.firstName,b.lastName].filter(Boolean).join(' ') || 'Client')+'</strong><span>'+escapeHtml(b.service)+' · '+escapeHtml(b.vehicle || 'Véhicule non précisé')+'</span></div><span class="agenda-status '+(b.status==='pending'?'is-pending':'is-paid')+'">'+(b.status==='pending'?'En attente':'Payé')+'</span></article>').join('');
+  }
+  if (selectedDate) $('#resetAgenda').hidden = false;
+  else $('#resetAgenda').hidden = true;
+}
 const emailStatusLabel = { pending: 'En attente', sending: 'En cours d’envoi', sent: 'Envoyé', failed: 'Échec' };
 async function renderNotifications() {
   const provider = $('#emailProvider'), box = $('#emailOutbox');
@@ -234,6 +260,8 @@ async function renderNotifications() {
     provider.textContent = data.configured
       ? 'Fournisseur : ' + data.provider + ' · Historique des envois conservé automatiquement.'
       : 'Aucun fournisseur e-mail valide. Configurez Resend ou SMTP avant de recevoir des réservations.';
+    const attentionCount = Number(counts.pending || 0) + Number(counts.sending || 0) + Number(counts.failed || 0);
+    const badge = $('#notificationBadge'); badge.textContent = attentionCount > 9 ? '9+' : String(attentionCount); badge.hidden = attentionCount === 0;
     $('#emailSentCount').textContent = Number(counts.sent || 0);
     $('#emailPendingCount').textContent = Number(counts.pending || 0) + Number(counts.sending || 0);
     $('#emailFailedCount').textContent = Number(counts.failed || 0);
@@ -356,6 +384,15 @@ $('#blocks').addEventListener('click', async event => {
 });
 
 $('#manualDate').min = new Date().toISOString().slice(0, 10);
+const bookingsModal = $('#bookingsModal'), notificationsModal = $('#notificationsModal');
+function openPanelModal(modal) { modal.hidden = false; document.body.classList.add('dialog-open'); }
+function closePanelModal(modal) { modal.hidden = true; document.body.classList.remove('dialog-open'); }
+$('#openBookings').addEventListener('click',()=>openPanelModal(bookingsModal));
+$('#closeBookings').addEventListener('click',()=>closePanelModal(bookingsModal));
+bookingsModal.addEventListener('click',event=>{if(event.target===bookingsModal)closePanelModal(bookingsModal);});
+$('#openNotifications').addEventListener('click',()=>openPanelModal(notificationsModal));
+$('#closeNotifications').addEventListener('click',()=>closePanelModal(notificationsModal));
+notificationsModal.addEventListener('click',event=>{if(event.target===notificationsModal)closePanelModal(notificationsModal);});
 const blockModal = $('#blockPeriodModal');
 function openBlockPeriod() { blockModal.hidden = false; document.body.classList.add('dialog-open'); $('#blockDate').focus(); }
 function closeBlockPeriod() { blockModal.hidden = true; document.body.classList.remove('dialog-open'); }

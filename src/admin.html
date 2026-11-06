@@ -17,18 +17,32 @@
     <a class="btn btn-primary btn-small" href="index.html">Voir le site</a>
   </header>
   <main class="admin-wrap">
-    <div class="section-label">ESPACE PROFESSIONNEL</div>
-    <h1>Planning & réservations</h1>
-    <p class="admin-intro">Gérez vos demandes, corrigez les informations d’une réservation et enregistrez les paiements après la prestation. Les clients ne paient pas en ligne.</p>
-    <div class="admin-toolbar"><button class="btn btn-secondary" id="openBlockPeriod" type="button">＋ Bloquer une période</button><button class="btn btn-primary" id="openManualBooking" type="button">＋ Ajouter une prestation</button></div>
-    <div class="admin-grid">
-      <section class="admin-card admin-calendar-card">
-        <div class="admin-section-heading"><div><div class="section-label">VUE D’ENSEMBLE</div><h3>Calendrier</h3><p class="empty">Prestations et indisponibilités en un coup d’œil.</p></div>
-          <div class="calendar-navigation"><button class="btn btn-secondary btn-small" id="calendarPrev" aria-label="Mois précédent">←</button><button class="btn btn-secondary btn-small" id="calendarToday">Aujourd’hui</button><button class="btn btn-secondary btn-small" id="calendarNext" aria-label="Mois suivant">→</button></div>
-        </div>
+    <div class="admin-page-heading"><div><div class="section-label">ESPACE PROFESSIONNEL</div><h1>Tableau de bord</h1></div>
+      <div class="admin-quick-actions">
+        <button class="icon-action" id="openNotifications" type="button" aria-label="Ouvrir les notifications" title="Notifications">✉<span class="notification-badge" id="notificationBadge" hidden>0</span></button>
+        <button class="btn btn-secondary" id="openBookings" type="button">☷ Réservations</button>
+        <button class="btn btn-secondary" id="openBlockPeriod" type="button">＋ Bloquer une période</button>
+        <button class="btn btn-primary" id="openManualBooking" type="button">＋ Ajouter une prestation</button>
+      </div>
+    </div>
+    <section class="dashboard-stats" aria-label="Indicateurs de l'activité">
+      <article class="dashboard-stat"><span>Prochaines prestations</span><strong id="statUpcoming">—</strong><small id="statUpcomingHint">À venir</small></article>
+      <article class="dashboard-stat"><span>Demandes en attente</span><strong id="statPending">—</strong><small>À traiter</small></article>
+      <article class="dashboard-stat"><span>Chiffre encaissé ce mois</span><strong id="statRevenue">—</strong><small>Paiements enregistrés</small></article>
+      <article class="dashboard-stat"><span>Indisponibilités à venir</span><strong id="statBlocks">—</strong><small>Périodes bloquées</small></article>
+    </section>
+    <div class="admin-grid dashboard-main-grid">
+      <section class="admin-card admin-calendar-card"><div class="admin-section-heading"><div><div class="section-label">PLANNING</div><h3>Calendrier des prestations</h3></div>
+        <div class="calendar-navigation"><button class="btn btn-secondary btn-small" id="calendarPrev" aria-label="Mois précédent">←</button><button class="btn btn-secondary btn-small" id="calendarToday">Aujourd’hui</button><button class="btn btn-secondary btn-small" id="calendarNext" aria-label="Mois suivant">→</button></div></div>
         <div class="calendar-month-title" id="calendarMonthTitle"></div><div class="admin-calendar" id="adminCalendar"></div>
         <div class="calendar-legend"><span><i class="calendar-dot dot-booking"></i>Prestation payée</span><span><i class="calendar-dot dot-pending"></i>En attente</span><span><i class="calendar-dot dot-block"></i>Indisponibilité</span></div>
       </section>
+      <aside class="admin-card dashboard-agenda-card"><div class="admin-section-heading"><div><div class="section-label">À VENIR</div><h3 id="agendaTitle">Prochaines prestations</h3></div><button class="text-action" id="resetAgenda" type="button">Tout voir</button></div>
+        <div id="upcomingAgenda" class="upcoming-agenda"><p class="empty">Chargement du planning…</p></div></aside>
+    </div>
+  </main>
+  <div class="manual-booking-modal" id="bookingsModal" hidden><section class="bookings-modal-panel" role="dialog" aria-modal="true" aria-labelledby="bookingsModalTitle">
+    <div class="manual-booking-modal-heading"><div><div class="section-label">ESPACE PROFESSIONNEL</div><h2 id="bookingsModalTitle">Réservations</h2></div><button class="manual-modal-close" id="closeBookings" type="button" aria-label="Fermer">×</button></div>
       <section class="admin-card admin-bookings-card">
         <div class="admin-section-heading">
           <div><h3>Réservations</h3><p class="empty" id="bookingCount">Chargement…</p></div>
@@ -50,8 +64,11 @@
           </table>
         </div>
         <div class="booking-pagination"><button class="btn btn-secondary btn-small" id="bookingPrev" disabled>← Précédent</button><span id="bookingPageLabel" aria-live="polite">Page 1</span><button class="btn btn-secondary btn-small" id="bookingNext" disabled>Suivant →</button></div>
-        <p class="booking-table-help">Sélectionnez « Détails / modifier » pour consulter ou corriger une réservation. La suppression est définitive.</p>
+        
       </section>
+  </section></div>
+  <div class="manual-booking-modal" id="notificationsModal" hidden><section class="notifications-modal-panel" role="dialog" aria-modal="true" aria-labelledby="notificationsModalTitle">
+    <div class="manual-booking-modal-heading"><div><div class="section-label">ESPACE PROFESSIONNEL</div><h2 id="notificationsModalTitle">Notifications e-mail</h2></div><button class="manual-modal-close" id="closeNotifications" type="button" aria-label="Fermer">×</button></div>
       <section class="admin-card admin-bookings-card">
         <div class="admin-section-heading">
           <h3>Notifications e-mail</h3>
@@ -66,10 +83,9 @@
         <p class="email-attention-label">Notifications à surveiller</p>
         <ul class="admin-list" id="emailOutbox"></ul>
       </section>
-    </div>
-  </main>
+  </section></div>
   <div class="manual-booking-modal" id="blockPeriodModal" hidden>      <section class="block-period-modal-panel" role="dialog" aria-modal="true" aria-labelledby="blockPeriodTitle">
-        <div class="manual-booking-modal-heading"><div><div class="section-label">ESPACE PROFESSIONNEL</div><h2 id="blockPeriodTitle">Bloquer une période</h2></div><button class="manual-modal-close" id="closeBlockPeriod" type="button" aria-label="Fermer">×</button></div><p class="empty">Choisissez librement les heures de début et de fin. Les prestations qui chevauchent cette période seront empêchées.</p>
+        <div class="manual-booking-modal-heading"><div><div class="section-label">ESPACE PROFESSIONNEL</div><h2 id="blockPeriodTitle">Bloquer une période</h2></div><button class="manual-modal-close" id="closeBlockPeriod" type="button" aria-label="Fermer">×</button></div>
         <div class="block-form-grid">
           <label>Date<input type="date" id="blockDate"></label>
           <label>Motif (facultatif)<input type="text" id="blockLabel" maxlength="80" placeholder="Cours, rendez-vous, vie privée…"></label>
@@ -82,7 +98,7 @@
 </div>
   <div class="manual-booking-modal" id="manualBookingModal" hidden>      <section class="manual-booking-modal-panel" role="dialog" aria-modal="true" aria-labelledby="manualBookingTitle">
         <div class="manual-booking-modal-heading"><div><div class="section-label">ESPACE PROFESSIONNEL</div><h2 id="manualBookingTitle">Ajouter une prestation</h2></div><button class="manual-modal-close" id="closeManualBooking" type="button" aria-label="Fermer">×</button></div>
-        <p class="empty">Renseignez les informations du rendez-vous. Les coordonnées du client sont facultatives.</p>
+        
         <form id="manualBookingForm"><div class="manual-booking-grid">
           <label>Formule<select id="manualService" required><option value="Essentielle">Essentielle — 79 €</option><option value="Premium">Premium — 129 €</option></select></label>
           <label>Date<input id="manualDate" type="date" required></label>
