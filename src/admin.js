@@ -4,6 +4,40 @@ let ALL_BOOKINGS = [];
 let CURRENT_PAGE = 1;
 const PAGE_SIZE = 25;
 const SERVICE_PRICES = { Essentielle: 79, Premium: 129 };
+let dialogResolver = null;
+function showToast(message, type = 'success') {
+  const host = $('#adminToast');
+  if (!host) return;
+  host.textContent = message;
+  host.className = 'admin-toast is-visible ' + (type === 'error' ? 'is-error' : 'is-success');
+  clearTimeout(showToast.timer);
+  showToast.timer = setTimeout(() => host.classList.remove('is-visible'), 4200);
+}
+function showDialog({ title = 'Épure Auto', message = '', confirmLabel = 'OK', cancelLabel = '', input = false, password = false, placeholder = '' } = {}) {
+  const overlay = $('#adminDialog'), field = $('#adminDialogInput');
+  $('#adminDialogTitle').textContent = title; $('#adminDialogMessage').textContent = message;
+  $('#adminDialogConfirm').textContent = confirmLabel; $('#adminDialogCancel').hidden = !cancelLabel;
+  $('#adminDialogCancel').textContent = cancelLabel || 'Annuler';
+  field.hidden = !input; field.type = password ? 'password' : 'text'; field.placeholder = placeholder; field.value = '';
+  overlay.hidden = false; document.body.classList.add('dialog-open');
+  if (input) field.focus(); else $('#adminDialogConfirm').focus();
+  return new Promise(resolve => { dialogResolver = resolve; });
+}
+function closeDialog(value) {
+  const overlay = $('#adminDialog'); if (overlay.hidden) return;
+  overlay.hidden = true; document.body.classList.remove('dialog-open');
+  const resolve = dialogResolver; dialogResolver = null; if (resolve) resolve(value);
+}
+function showConfirm(message, title = 'Confirmer cette action') {
+  return showDialog({ title, message, confirmLabel: 'Confirmer', cancelLabel: 'Annuler' });
+}
+$('#adminDialogForm').addEventListener('submit', event => {
+  event.preventDefault(); closeDialog($('#adminDialogInput').hidden ? true : $('#adminDialogInput').value);
+});
+$('#adminDialogCancel').addEventListener('click', () => closeDialog(false));
+$('#adminDialog').addEventListener('click', event => { if (event.target === $('#adminDialog')) closeDialog(false); });
+document.addEventListener('keydown', event => { if (event.key === 'Escape' && !$('#adminDialog').hidden) closeDialog(false); });
+
 function headers(json = false) {
   const h = {};
   if (json) h['Content-Type'] = 'application/json';
@@ -172,22 +206,22 @@ async function sendPayment(id, button) {
   const addons = [];
   for (const line of addonText.split(/\r?\n/).map(value => value.trim()).filter(Boolean)) {
     const separator = line.lastIndexOf('|');
-    if (separator < 1) return alert('Format invalide. Utilisez : intitulé | prix en euros.');
+    if (separator < 1) return showToast('Format invalide. Utilisez : intitulé | prix en euros.');
     const name = line.slice(0, separator).trim(), amountText = line.slice(separator + 1).trim();
-    if (!name || !/^\d+$/.test(amountText)) return alert('Chaque supplément doit avoir un intitulé et un prix entier en euros.');
+    if (!name || !/^\d+$/.test(amountText)) return showToast('Chaque supplément doit avoir un intitulé et un prix entier en euros.');
     addons.push({ name, amount: Number(amountText) });
   }
   const methodLabel = paymentMethod === 'card' ? 'carte bancaire' : 'espèces';
-  if (!confirm('Confirmez-vous que le nettoyage est terminé, que le client a accepté la formule et les suppléments, et que le règlement par ' + methodLabel + ' a réellement été reçu ?')) return;
+  if (!await showConfirm('Confirmez-vous que le nettoyage est terminé, que le client a accepté la formule et les suppléments, et que le règlement par ' + methodLabel + ' a réellement été reçu ?')) return;
   button.disabled = true;
   try {
     const d = await api('/api/admin/bookings/' + encodeURIComponent(id) + '/payment', {
       method: 'POST', body: JSON.stringify({ service, addons, paymentMethod, customerAgreed: true })
     });
-    if (d.emailSent) alert('Paiement de ' + d.totalAmount + ' € enregistré. Le reçu a été envoyé.');
-    else alert('Paiement enregistré. Vérifiez la file des notifications e-mail.');
+    if (d.emailSent) showToast('Paiement de ' + d.totalAmount + ' € enregistré. Le reçu a été envoyé.');
+    else showToast('Paiement enregistré. Vérifiez la file des notifications e-mail.');
     await render();
-  } catch (e) { alert(e.message); button.disabled = false; }
+  } catch (e) { showToast(e.message, 'error'); button.disabled = false; }
 }
 async function saveBooking(form) {
   const id = form.dataset.editForm;
@@ -195,23 +229,23 @@ async function saveBooking(form) {
   form.querySelectorAll('[data-field]').forEach(input => { values[input.dataset.field] = input.value; });
   try {
     await api('/api/admin/bookings/' + encodeURIComponent(id), { method: 'PATCH', body: JSON.stringify(values) });
-    alert('Réservation mise à jour.');
+    showToast('Réservation mise à jour.');
     await render();
     const row = $('#details-' + CSS.escape(id));
     if (row) row.hidden = false;
-  } catch (e) { alert(e.message); }
+  } catch (e) { showToast(e.message, 'error'); }
 }
 async function deleteBooking(id) {
   const booking = ALL_BOOKINGS.find(item => item.id === id);
   if (!booking) return;
   const identity = booking.firstName + ' ' + booking.lastName + ' · ' + booking.date;
-  if (!confirm('Supprimer définitivement la réservation de ' + identity + ' ?\n\nCette action supprime la réservation et ses photos associées. Elle est irréversible.')) return;
+  if (!await showConfirm('Supprimer définitivement la réservation de ' + identity + ' ?\n\nCette action supprime la réservation et ses photos associées. Elle est irréversible.')) return;
   try {
     await api('/api/admin/bookings/' + encodeURIComponent(id), { method: 'DELETE' });
     ALL_BOOKINGS = ALL_BOOKINGS.filter(item => item.id !== id);
     applyBookingFilters();
-    alert('Réservation supprimée.');
-  } catch (e) { alert(e.message); }
+    showToast('Réservation supprimée.');
+  } catch (e) { showToast(e.message); }
 }
 $('#bookings').addEventListener('click', async event => {
   const button = event.target.closest('button[data-action]');
@@ -225,9 +259,9 @@ $('#bookings').addEventListener('click', async event => {
   if (action === 'delete-booking') await deleteBooking(id);
   if (action === 'payment') await sendPayment(id, button);
   if (action === 'decline') {
-    if (!confirm('Refuser cette demande ?')) return;
+    if (!await showConfirm('Refuser cette demande ?')) return;
     try { await api('/api/admin/bookings/' + encodeURIComponent(id) + '/decline', { method: 'POST' }); await render(); }
-    catch (e) { alert(e.message); }
+    catch (e) { showToast(e.message); }
   }
   if (action === 'cancel-edit') {
     const row = button.closest('.booking-detail-row');
@@ -236,12 +270,12 @@ $('#bookings').addEventListener('click', async event => {
   }
   if (action === 'remove-block') {
     try { await api('/api/admin/blocks/' + encodeURIComponent(id), { method: 'DELETE' }); await renderBlocks(await api('/api/admin/blocks')); }
-    catch (e) { alert(e.message); }
+    catch (e) { showToast(e.message); }
   }
   if (action === 'retry-email') {
     button.disabled = true;
     try { await api('/api/admin/email-outbox/' + encodeURIComponent(id) + '/retry', { method: 'POST' }); await renderNotifications(); }
-    catch (e) { alert(e.message); button.disabled = false; }
+    catch (e) { showToast(e.message); button.disabled = false; }
   }
 });
 $('#bookings').addEventListener('submit', event => {
@@ -258,7 +292,7 @@ $('#emailOutbox').addEventListener('click', async event => {
     await api('/api/admin/email-outbox/' + encodeURIComponent(button.dataset.id) + '/retry', { method: 'POST' });
     await renderNotifications();
   } catch (e) {
-    alert(e.message);
+    showToast(e.message);
     button.disabled = false;
   }
 });
@@ -266,14 +300,14 @@ $('#blocks').addEventListener('click', async event => {
   const button = event.target.closest('button[data-action="remove-block"]');
   if (!button) return;
   try { await api('/api/admin/blocks/' + encodeURIComponent(button.dataset.id), { method: 'DELETE' }); await renderBlocks(await api('/api/admin/blocks')); }
-  catch (e) { alert(e.message); }
+  catch (e) { showToast(e.message); }
 });
 $('#blockDate').min = new Date().toISOString().slice(0, 10);
 $('#blockBtn').onclick = async () => {
   const date = $('#blockDate').value, time = $('#blockTime').value;
-  if (!date) return alert('Choisissez une date.');
+  if (!date) return showToast('Choisissez une date.', 'error');
   try { await api('/api/admin/blocks', { method: 'POST', body: JSON.stringify({ date, time }) }); await renderBlocks(await api('/api/admin/blocks')); }
-  catch (e) { alert(e.message); }
+  catch (e) { showToast(e.message); }
 };
 $('#clearBtn').onclick = () => render();
 $('#refreshEmails').onclick = () => renderNotifications();
@@ -282,7 +316,14 @@ $('#bookingStatus').addEventListener('change', () => { CURRENT_PAGE = 1; applyBo
 $('#bookingPrev').addEventListener('click', () => { CURRENT_PAGE = Math.max(1, CURRENT_PAGE - 1); applyBookingFilters(); });
 $('#bookingNext').addEventListener('click', () => { CURRENT_PAGE += 1; applyBookingFilters(); });
 if (!ADMIN_KEY) {
-  ADMIN_KEY = prompt('Clé administrateur (ADMIN_KEY) :') || '';
-  if (ADMIN_KEY) localStorage.setItem('epure_admin_key', ADMIN_KEY);
+  ADMIN_KEY = '';
 }
-render();
+async function startAdmin() {
+  if (!ADMIN_KEY) {
+    const entered = await showDialog({ title: 'Accès professionnel', message: 'Saisissez votre clé administrateur pour accéder à votre espace pro.', confirmLabel: 'Se connecter', cancelLabel: 'Annuler', input: true, password: true, placeholder: 'Clé administrateur' });
+    ADMIN_KEY = typeof entered === 'string' ? entered.trim() : '';
+    if (ADMIN_KEY) localStorage.setItem('epure_admin_key', ADMIN_KEY);
+  }
+  render();
+}
+startAdmin();
