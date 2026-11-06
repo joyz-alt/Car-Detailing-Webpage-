@@ -7,6 +7,8 @@
   <meta name="robots" content="noindex,nofollow">
   <title>Épure Auto — Espace pro</title>
   <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/themes/dark.css">
 </head>
 
 <body class="admin-body">
@@ -18,7 +20,7 @@
     <div class="section-label">ESPACE PROFESSIONNEL</div>
     <h1>Planning & réservations</h1>
     <p class="admin-intro">Gérez vos demandes, corrigez les informations d’une réservation et enregistrez les paiements après la prestation. Les clients ne paient pas en ligne.</p>
-    <div class="admin-toolbar"><button class="btn btn-primary" id="openManualBooking" type="button">＋ Ajouter une prestation</button></div>
+    <div class="admin-toolbar"><button class="btn btn-secondary" id="openBlockPeriod" type="button">＋ Bloquer une période</button><button class="btn btn-primary" id="openManualBooking" type="button">＋ Ajouter une prestation</button></div>
     <div class="admin-grid">
       <section class="admin-card admin-calendar-card">
         <div class="admin-section-heading"><div><div class="section-label">VUE D’ENSEMBLE</div><h3>Calendrier</h3><p class="empty">Prestations et indisponibilités en un coup d’œil.</p></div>
@@ -26,17 +28,6 @@
         </div>
         <div class="calendar-month-title" id="calendarMonthTitle"></div><div class="admin-calendar" id="adminCalendar"></div>
         <div class="calendar-legend"><span><i class="calendar-dot dot-booking"></i>Prestation payée</span><span><i class="calendar-dot dot-pending"></i>En attente</span><span><i class="calendar-dot dot-block"></i>Indisponibilité</span></div>
-      </section>
-      <section class="admin-card admin-block-card">
-        <h3>Bloquer une période</h3><p class="empty">Choisissez librement les heures de début et de fin. Les prestations qui chevauchent cette période seront empêchées.</p>
-        <div class="block-form-grid">
-          <label>Date<input type="date" id="blockDate"></label>
-          <label>Motif (facultatif)<input type="text" id="blockLabel" maxlength="80" placeholder="Cours, rendez-vous, vie privée…"></label>
-          <label>De<input type="time" id="blockTime" step="900" value="09:00"></label>
-          <label>À<input type="time" id="blockEndTime" step="900" value="12:00"></label>
-        </div>
-        <button class="btn btn-primary" id="blockBtn">＋ Bloquer cette période</button>
-        <div class="calendar-blocks-heading"><h4>Périodes bloquées</h4><span class="empty" id="blockCount"></span></div><ul class="admin-list" id="blocks"></ul>
       </section>
       <section class="admin-card admin-bookings-card">
         <div class="admin-section-heading">
@@ -77,6 +68,18 @@
       </section>
     </div>
   </main>
+  <div class="manual-booking-modal" id="blockPeriodModal" hidden>      <section class="block-period-modal-panel" role="dialog" aria-modal="true" aria-labelledby="blockPeriodTitle">
+        <div class="manual-booking-modal-heading"><div><div class="section-label">ESPACE PROFESSIONNEL</div><h2 id="blockPeriodTitle">Bloquer une période</h2></div><button class="manual-modal-close" id="closeBlockPeriod" type="button" aria-label="Fermer">×</button></div><p class="empty">Choisissez librement les heures de début et de fin. Les prestations qui chevauchent cette période seront empêchées.</p>
+        <div class="block-form-grid">
+          <label>Date<input type="date" id="blockDate"></label>
+          <label>Motif (facultatif)<input type="text" id="blockLabel" maxlength="80" placeholder="Cours, rendez-vous, vie privée…"></label>
+          <label>De<input type="time" id="blockTime" step="900" value="09:00"></label>
+          <label>À<input type="time" id="blockEndTime" step="900" value="12:00"></label>
+        </div>
+        <button class="btn btn-primary" id="blockBtn">＋ Bloquer cette période</button>
+        <div class="calendar-blocks-heading"><h4>Périodes bloquées</h4><span class="empty" id="blockCount"></span></div><ul class="admin-list" id="blocks"></ul>
+      </section>
+</div>
   <div class="manual-booking-modal" id="manualBookingModal" hidden>      <section class="manual-booking-modal-panel" role="dialog" aria-modal="true" aria-labelledby="manualBookingTitle">
         <div class="manual-booking-modal-heading"><div><div class="section-label">ESPACE PROFESSIONNEL</div><h2 id="manualBookingTitle">Ajouter une prestation</h2></div><button class="manual-modal-close" id="closeManualBooking" type="button" aria-label="Fermer">×</button></div>
         <p class="empty">Renseignez les informations du rendez-vous. Les coordonnées du client sont facultatives.</p>
@@ -105,6 +108,8 @@
       <div class="admin-dialog-actions"><button class="btn btn-secondary" id="adminDialogCancel" type="button">Annuler</button><button class="btn btn-primary" id="adminDialogConfirm" type="submit">Confirmer</button></div>
     </form>
   </div>
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13"></script>
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/l10n/fr.js"></script>
   <script src="admin.js"></script>
 </body>
 </html>
