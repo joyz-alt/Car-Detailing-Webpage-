@@ -186,14 +186,21 @@ async function renderNotifications() {
   const provider = $('#emailProvider'), box = $('#emailOutbox');
   try {
     const data = await api('/api/admin/email-outbox');
-    provider.textContent = data.configured ? 'Fournisseur : ' + data.provider + ' · File de notifications' :
-      'Aucun fournisseur e-mail valide. Configurez Resend ou SMTP avant de recevoir des réservations.';
-    if (!data.messages.length) { box.innerHTML = '<li class="empty">Aucune notification en file.</li>'; return; }
+    const counts = data.counts || {};
+    provider.textContent = data.configured
+      ? 'Fournisseur : ' + data.provider + ' · Historique des envois conservé automatiquement.'
+      : 'Aucun fournisseur e-mail valide. Configurez Resend ou SMTP avant de recevoir des réservations.';
+    $('#emailSentCount').textContent = Number(counts.sent || 0);
+    $('#emailPendingCount').textContent = Number(counts.pending || 0) + Number(counts.sending || 0);
+    $('#emailFailedCount').textContent = Number(counts.failed || 0);
+    if (!data.messages.length) {
+      box.innerHTML = '<li class="empty email-all-clear">Aucune notification ne nécessite votre attention.</li>';
+      return;
+    }
     box.innerHTML = data.messages.map(m => '<li class="booking-admin-item"><div><strong>' + escapeHtml(m.subject) + '</strong><br>' +
       '<span class="empty">' + escapeHtml(m.recipient) + ' · ' + escapeHtml(emailStatusLabel[m.status] || m.status) +
       ' · tentatives : ' + escapeHtml(m.attempts) + '</span>' +
       (m.lastError ? '<br><span class="photo-count">' + escapeHtml(m.lastError) + '</span>' : '') +
-      (m.sentAt ? '<br><span class="empty">Envoyé le ' + escapeHtml(new Date(m.sentAt).toLocaleString('fr-FR')) + '</span>' : '') +
       '</div><div class="admin-actions">' + (m.status === 'failed' ? '<button class="btn btn-secondary btn-small" data-action="retry-email" data-id="' + escapeHtml(m.id) + '">Réessayer</button>' : '') +
       '</div></li>').join('');
   } catch (e) { provider.textContent = 'Impossible de lire la file e-mail : ' + e.message; box.innerHTML = ''; }
