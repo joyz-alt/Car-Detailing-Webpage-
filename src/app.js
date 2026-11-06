@@ -53,7 +53,10 @@ function validateStep(step) {
 
 let availabilityWeekOffset = 0;
 
+let availabilityRequestId = 0;
+
 async function loadSlots(preserveScroll = false) {
+  const requestId = ++availabilityRequestId;
   const scrollTop = preserveScroll ? window.scrollY : null;
   const restoreScroll = () => {
     if (scrollTop === null) return;
@@ -63,8 +66,12 @@ async function loadSlots(preserveScroll = false) {
   const prev = $('#weekPrev');
   const next = $('#weekNext');
   const label = $('#weekLabel');
-  box.innerHTML = '<span class="empty-slot">Recherche des disponibilités…</span>';
-  restoreScroll();
+
+  // Keep the current week visible while the next one loads to avoid a flash/layout jump.
+  box.classList.add('is-loading');
+  box.setAttribute('aria-busy', 'true');
+  prev.disabled = true;
+  next.disabled = true;
   $('#date').value = '';
   $('#time').value = '';
 
@@ -72,65 +79,77 @@ async function loadSlots(preserveScroll = false) {
     const r = await fetch(`/api/next-availability?service=${encodeURIComponent(selectedService())}&week=${availabilityWeekOffset}`);
     const data = await r.json();
     if (!r.ok) throw new Error(data.error || 'Erreur');
+    if (requestId !== availabilityRequestId) return;
 
+    const days = data.days || [];
+    const content = document.createDocumentFragment();
+
+    if (!days.some(day => day.slots.length)) {
+      const empty = document.createElement('span');
+      empty.className = 'empty-slot';
+      empty.textContent = 'Aucun créneau disponible cette semaine. Passez à la semaine suivante pour consulter les prochaines disponibilités.';
+      content.appendChild(empty);
+    } else {
+      days.forEach(day => {
+        const card = document.createElement('section');
+        card.className = 'availability-day' + (day.slots.length ? '' : ' is-full');
+        const dateLabel = new Date(day.date + 'T12:00:00').toLocaleDateString('fr-FR', {
+          weekday: 'short', day: 'numeric', month: 'short'
+        });
+        const heading = document.createElement('h4');
+        heading.textContent = dateLabel.charAt(0).toUpperCase() + dateLabel.slice(1);
+        card.appendChild(heading);
+
+        if (!day.slots.length) {
+          const full = document.createElement('span');
+          full.className = 'availability-full';
+          full.textContent = 'Complet';
+          card.appendChild(full);
+        } else {
+          const times = document.createElement('div');
+          times.className = 'availability-times';
+          day.slots.forEach(slot => {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'availability-time-button';
+            button.textContent = slot.time;
+            button.setAttribute('aria-label', `${dateLabel} à ${slot.time}`);
+            button.setAttribute('aria-pressed', 'false');
+            button.onclick = () => {
+              $$('.availability-time-button').forEach(item => {
+                item.classList.remove('selected');
+                item.setAttribute('aria-pressed', 'false');
+              });
+              button.classList.add('selected');
+              button.setAttribute('aria-pressed', 'true');
+              $('#date').value = slot.date;
+              $('#time').value = slot.time;
+              updateEarlyExecutionConsent();
+            };
+            times.appendChild(button);
+          });
+          card.appendChild(times);
+        }
+        content.appendChild(card);
+      });
+    }
+
+    box.replaceChildren(content);
     label.textContent = data.weekLabel || '';
     prev.disabled = availabilityWeekOffset === 0;
     next.disabled = !data.hasNextWeek;
-    box.innerHTML = '';
-
-    const days = data.days || [];
-    if (!days.some(day => day.slots.length)) {
-      box.innerHTML = '<span class="empty-slot">Aucun créneau disponible cette semaine. Passez à la semaine suivante pour consulter les prochaines disponibilités.</span>';
-      restoreScroll();
-      return;
-    }
-
-    days.forEach(day => {
-      const card = document.createElement('section');
-      card.className = 'availability-day' + (day.slots.length ? '' : ' is-full');
-      const dateLabel = new Date(day.date + 'T12:00:00').toLocaleDateString('fr-FR', {
-        weekday: 'short', day: 'numeric', month: 'short'
-      });
-      const heading = document.createElement('h4');
-      heading.textContent = dateLabel.charAt(0).toUpperCase() + dateLabel.slice(1);
-      card.appendChild(heading);
-
-      if (!day.slots.length) {
-        const full = document.createElement('span');
-        full.className = 'availability-full';
-        full.textContent = 'Complet';
-        card.appendChild(full);
-      } else {
-        const times = document.createElement('div');
-        times.className = 'availability-times';
-        day.slots.forEach(slot => {
-          const button = document.createElement('button');
-          button.type = 'button';
-          button.className = 'availability-time-button';
-          button.textContent = slot.time;
-          button.setAttribute('aria-label', `${dateLabel} à ${slot.time}`);
-          button.onclick = () => {
-            $$('.availability-time-button').forEach(item => {
-              item.classList.remove('selected');
-              item.setAttribute('aria-pressed', 'false');
-            });
-            button.classList.add('selected');
-            button.setAttribute('aria-pressed', 'true');
-            $('#date').value = slot.date;
-            $('#time').value = slot.time;
-            updateEarlyExecutionConsent();
-          };
-          button.setAttribute('aria-pressed', 'false');
-          times.appendChild(button);
-        });
-        card.appendChild(times);
-      }
-      box.appendChild(card);
-    });
-    restoreScroll();
   } catch (err) {
-    box.innerHTML = '<span class="empty-slot">Impossible de charger les disponibilités. Veuillez réessayer.</span>';
-    restoreScroll();
+    if (requestId !== availabilityRequestId) return;
+    const error = document.createElement('span');
+    error.className = 'empty-slot';
+    error.textContent = 'Impossible de charger les disponibilités. Veuillez réessayer.';
+    box.replaceChildren(error);
+  } finally {
+    if (requestId === availabilityRequestId) {
+      box.classList.remove('is-loading');
+      box.removeAttribute('aria-busy');
+      restoreScroll();
+    }
   }
 }
 
