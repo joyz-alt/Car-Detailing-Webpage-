@@ -250,6 +250,18 @@ $('#bookings').addEventListener('submit', event => {
   event.preventDefault();
   saveBooking(form);
 });
+$('#emailOutbox').addEventListener('click', async event => {
+  const button = event.target.closest('button[data-action="retry-email"]');
+  if (!button) return;
+  button.disabled = true;
+  try {
+    await api('/api/admin/email-outbox/' + encodeURIComponent(button.dataset.id) + '/retry', { method: 'POST' });
+    await renderNotifications();
+  } catch (e) {
+    alert(e.message);
+    button.disabled = false;
+  }
+});
 $('#blocks').addEventListener('click', async event => {
   const button = event.target.closest('button[data-action="remove-block"]');
   if (!button) return;
