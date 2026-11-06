@@ -705,7 +705,7 @@ app.post('/api/admin/email-outbox/:id/retry', adminGuard, asyncHandler(async (re
 }));
 
 app.get('/api/admin/bookings', adminGuard, asyncHandler(async (req, res) => {
-  const result = await pool.query(BOOKING_SELECT + 'ORDER BY b.booking_date, b.booking_time, b.created_at DESC');
+  const result = await pool.query(BOOKING_SELECT + 'ORDER BY CASE WHEN b.booking_date >= CURRENT_DATE THEN 0 ELSE 1 END, CASE WHEN b.booking_date >= CURRENT_DATE THEN b.booking_date END ASC, b.booking_date DESC, b.booking_time ASC, b.created_at DESC');
   res.json(await Promise.all(result.rows.map(async b => ({ ...b, photos: await photoList(b.id) }))));
 }));
 app.get('/api/admin/blocks', adminGuard, asyncHandler(async (req, res) => {
