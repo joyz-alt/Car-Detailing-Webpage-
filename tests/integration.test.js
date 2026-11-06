@@ -263,8 +263,9 @@ test('admin can permanently delete a booking and unauthenticated deletion is rej
   const denied = await fetch(endpoint, { method: 'DELETE' });
   assert.equal(denied.status, 401);
   const response = await fetch(endpoint, { method: 'DELETE', headers: { 'x-admin-key': adminKey } });
-  assert.equal(response.status, 200, await response.text());
-  assert.deepEqual(await response.json(), { ok: true, deleted: true });
+  const payload = await response.json();
+  assert.equal(response.status, 200, JSON.stringify(payload));
+  assert.deepEqual(payload, { ok: true, deleted: true });
   const stored = await pool.query('SELECT id FROM bookings WHERE id = $1', [firstBookingId]);
   assert.equal(stored.rowCount, 0);
   const outbox = await pool.query('SELECT booking_id FROM email_outbox WHERE dedupe_key LIKE $1', ['booking:' + firstBookingId + ':%']);
