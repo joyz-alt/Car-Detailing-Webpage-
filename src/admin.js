@@ -223,9 +223,9 @@ $('#calendarNext').addEventListener('click',()=>{CALENDAR_MONTH=new Date(CALENDA
 $('#calendarToday').addEventListener('click',()=>{CALENDAR_MONTH=new Date(new Date().getFullYear(),new Date().getMonth(),1);renderCalendar();});
 $('#adminCalendar').addEventListener('click',event=>{
   const day=event.target.closest('[data-calendar-date]');if(!day)return;
-  $('#blockDate').value=day.dataset.calendarDate;$('#blockDate').focus();
-  showToast('Date sélectionnée : '+formatBookingDate(day.dataset.calendarDate)+'.');
+  renderDashboardOverview(day.dataset.calendarDate);
 });
+$('#resetAgenda').addEventListener('click',()=>renderDashboardOverview());
 function renderDashboardOverview(selectedDate = null) {
   const today = calendarDateKey(new Date());
   const active = ALL_BOOKINGS.filter(b => b.status !== 'declined');
@@ -260,7 +260,9 @@ async function renderNotifications() {
     provider.textContent = data.configured
       ? 'Fournisseur : ' + data.provider + ' · Historique des envois conservé automatiquement.'
       : 'Aucun fournisseur e-mail valide. Configurez Resend ou SMTP avant de recevoir des réservations.';
-    const attentionCount = Number(counts.pending || 0) + Number(counts.sending || 0) + Number(counts.failed || 0);\n    const badge = $('#notificationBadge'); badge.textContent = attentionCount > 9 ? '9+' : String(attentionCount); badge.hidden = attentionCount === 0;\n    $('#emailSentCount').textContent = Number(counts.sent || 0);
+    const attentionCount = Number(counts.pending || 0) + Number(counts.sending || 0) + Number(counts.failed || 0);
+    const badge = $('#notificationBadge'); badge.textContent = attentionCount > 9 ? '9+' : String(attentionCount); badge.hidden = attentionCount === 0;
+    $('#emailSentCount').textContent = Number(counts.sent || 0);
     $('#emailPendingCount').textContent = Number(counts.pending || 0) + Number(counts.sending || 0);
     $('#emailFailedCount').textContent = Number(counts.failed || 0);
     if (!data.messages.length) {
