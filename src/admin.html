@@ -10,42 +10,53 @@
 </head>
 
 <body class="admin-body">
-  <header class="site-header"><a class="brand" href="index.html"><span class="brand-mark">É</span><span>ÉPURE AUTO<span
-          class="brand-dot">.</span></span></a><a class="btn btn-primary btn-small" href="index.html">Voir le site</a>
+  <header class="site-header">
+    <a class="brand" href="index.html"><span class="brand-mark">É</span><span>ÉPURE AUTO<span class="brand-dot">.</span></span></a>
+    <a class="btn btn-primary btn-small" href="index.html">Voir le site</a>
   </header>
   <main class="admin-wrap">
     <div class="section-label">ESPACE PROFESSIONNEL</div>
     <h1>Planning & réservations</h1>
-    <p class="admin-intro">Les clients réservent sans paiement en ligne. Après le nettoyage, confirmez avec le client la formule et chaque supplément, encaissez le règlement en personne (carte sur votre terminal / application ou espèces), puis enregistrez-le ici pour sauvegarder le détail dans la base de données et envoyer un reçu par e-mail. N’enregistrez jamais un paiement avant de l’avoir réellement reçu et n’ajoutez pas un supplément déjà inclus dans la formule.</p>
+    <p class="admin-intro">Gérez vos demandes, corrigez les informations d’une réservation et enregistrez les paiements après la prestation. Les clients ne paient pas en ligne.</p>
     <div class="admin-grid">
       <section class="admin-card">
         <h3>Bloquer un créneau</h3>
         <p class="empty">Pour les cours, congés, indisponibilités ou rendez-vous personnels.</p>
         <label>Date<input type="date" id="blockDate"></label>
         <label>Heure<select id="blockTime">
-            <option>09:00</option>
-            <option>10:30</option>
-            <option>12:00</option>
-            <option>13:00</option>
-            <option>14:00</option>
-            <option>14:30</option>
-            <option>15:30</option>
-            <option>17:00</option>
-          </select></label>
+          <option>09:00</option><option>10:30</option><option>12:00</option><option>13:00</option>
+          <option>14:00</option><option>14:30</option><option>15:30</option><option>17:00</option>
+        </select></label>
         <button class="btn btn-primary" id="blockBtn">Bloquer ce créneau</button>
       </section>
       <section class="admin-card">
         <h3>Créneaux bloqués</h3>
         <ul class="admin-list" id="blocks"></ul>
       </section>
-      <section class="admin-card" style="grid-column:1/-1">
-        <div style="display:flex;justify-content:space-between;gap:15px;align-items:center">
-          <h3>Réservations</h3><button class="btn btn-secondary" id="clearBtn">Actualiser les données</button>
+      <section class="admin-card admin-bookings-card">
+        <div class="admin-section-heading">
+          <div><h3>Réservations</h3><p class="empty" id="bookingCount">Chargement…</p></div>
+          <button class="btn btn-secondary" id="clearBtn">Actualiser</button>
         </div>
-        <ul class="admin-list" id="bookings"></ul>
+        <div class="booking-filters">
+          <label class="booking-search">Rechercher<input id="bookingSearch" type="search" placeholder="Nom, e-mail, téléphone, véhicule…"></label>
+          <label>Statut<select id="bookingStatus">
+            <option value="all">Tous les statuts</option>
+            <option value="pending">En attente</option>
+            <option value="confirmed">Payé</option>
+            <option value="declined">Refusé</option>
+          </select></label>
+        </div>
+        <div class="booking-table-wrap">
+          <table class="booking-table">
+            <thead><tr><th>Date & heure</th><th>Client</th><th>Prestation</th><th>Montant</th><th>Statut</th><th>Actions</th></tr></thead>
+            <tbody id="bookings"><tr><td colspan="6" class="empty">Chargement des réservations…</td></tr></tbody>
+          </table>
+        </div>
+        <p class="booking-table-help">Sélectionnez « Détails / modifier » pour consulter ou corriger une réservation. La suppression est définitive.</p>
       </section>
-      <section class="admin-card" style="grid-column:1/-1">
-        <div style="display:flex;justify-content:space-between;gap:15px;align-items:center">
+      <section class="admin-card admin-bookings-card">
+        <div class="admin-section-heading">
           <h3>Notifications e-mail</h3>
           <button class="btn btn-secondary" id="refreshEmails">Actualiser</button>
         </div>
@@ -56,5 +67,4 @@
   </main>
   <script src="admin.js"></script>
 </body>
-
 </html>
