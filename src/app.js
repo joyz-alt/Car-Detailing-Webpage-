@@ -53,12 +53,18 @@ function validateStep(step) {
 
 let availabilityWeekOffset = 0;
 
-async function loadSlots() {
+async function loadSlots(preserveScroll = false) {
+  const scrollTop = preserveScroll ? window.scrollY : null;
+  const restoreScroll = () => {
+    if (scrollTop === null) return;
+    requestAnimationFrame(() => window.scrollTo({ top: scrollTop, left: 0, behavior: 'instant' }));
+  };
   const box = $('#slots');
   const prev = $('#weekPrev');
   const next = $('#weekNext');
   const label = $('#weekLabel');
   box.innerHTML = '<span class="empty-slot">Recherche des disponibilités…</span>';
+  restoreScroll();
   $('#date').value = '';
   $('#time').value = '';
 
@@ -75,6 +81,7 @@ async function loadSlots() {
     const days = data.days || [];
     if (!days.some(day => day.slots.length)) {
       box.innerHTML = '<span class="empty-slot">Aucun créneau disponible cette semaine. Passez à la semaine suivante pour consulter les prochaines disponibilités.</span>';
+      restoreScroll();
       return;
     }
 
@@ -120,8 +127,10 @@ async function loadSlots() {
       }
       box.appendChild(card);
     });
+    restoreScroll();
   } catch (err) {
     box.innerHTML = '<span class="empty-slot">Impossible de charger les disponibilités. Veuillez réessayer.</span>';
+    restoreScroll();
   }
 }
 
@@ -322,8 +331,8 @@ function init() {
   });
 
   $('#service')?.addEventListener('change', () => { availabilityWeekOffset = 0; loadSlots(); });
-  $('#weekPrev')?.addEventListener('click', () => { if (availabilityWeekOffset > 0) { availabilityWeekOffset--; loadSlots(); } });
-  $('#weekNext')?.addEventListener('click', () => { availabilityWeekOffset++; loadSlots(); });
+  $('#weekPrev')?.addEventListener('click', () => { if (availabilityWeekOffset > 0) { availabilityWeekOffset--; loadSlots(true); } });
+  $('#weekNext')?.addEventListener('click', () => { availabilityWeekOffset++; loadSlots(true); });
     $('#photos')?.addEventListener('change', handlePhotoSelection);
   renderPhotoList();
   $$('.next-btn').forEach(b => b.addEventListener('click', () => goStep(current + 1)));
