@@ -2791,3 +2791,50 @@ body {
   .dashboard-main-grid .admin-calendar-card .calendar-event{font-size:7px}
   .calendar-navigation{grid-template-columns:38px minmax(0,1fr) 38px;gap:6px}
 }
+
+
+/* Mobile-friendly date picker used by manual bookings and blocked periods */
+.flatpickr-calendar.admin-mobile-datepicker,
+.flatpickr-calendar.open.admin-mobile-datepicker{
+  position:fixed!important;
+  top:50%!important;
+  left:50%!important;
+  right:auto!important;
+  bottom:auto!important;
+  width:min(360px,calc(100vw - 32px))!important;
+  max-width:calc(100vw - 32px);
+  padding:12px;
+  transform:translate(-50%,-50%);
+  border:1px solid var(--line);
+  border-radius:12px;
+  background:#171b21;
+  box-shadow:0 20px 70px rgba(0,0,0,.65);
+  z-index:10050!important;
+}
+.flatpickr-calendar.admin-mobile-datepicker:before,
+.flatpickr-calendar.admin-mobile-datepicker:after{display:none}
+.flatpickr-calendar.admin-mobile-datepicker .flatpickr-months{align-items:center;height:48px}
+.flatpickr-calendar.admin-mobile-datepicker .flatpickr-month{height:44px}
+.flatpickr-calendar.admin-mobile-datepicker .flatpickr-current-month{display:flex;align-items:center;justify-content:center;gap:5px;padding-top:0;font-size:16px}
+.flatpickr-calendar.admin-mobile-datepicker .flatpickr-current-month .flatpickr-monthDropdown-months,
+.flatpickr-calendar.admin-mobile-datepicker .flatpickr-current-month input.cur-year{font-size:15px;font-weight:700}
+.flatpickr-calendar.admin-mobile-datepicker .flatpickr-prev-month,
+.flatpickr-calendar.admin-mobile-datepicker .flatpickr-next-month{top:9px;width:36px;height:36px;padding:8px;border-radius:7px}
+.flatpickr-calendar.admin-mobile-datepicker .flatpickr-prev-month:hover,
+.flatpickr-calendar.admin-mobile-datepicker .flatpickr-next-month:hover{background:rgba(184,154,106,.16)}
+.flatpickr-calendar.admin-mobile-datepicker .flatpickr-weekdays{height:38px}
+.flatpickr-calendar.admin-mobile-datepicker span.flatpickr-weekday{font-size:11px;font-weight:700;color:#aeb4be}
+.flatpickr-calendar.admin-mobile-datepicker .flatpickr-days,
+.flatpickr-calendar.admin-mobile-datepicker .dayContainer{width:100%;min-width:0;max-width:none}
+.flatpickr-calendar.admin-mobile-datepicker .dayContainer{justify-content:space-around}
+.flatpickr-calendar.admin-mobile-datepicker .flatpickr-day{flex-basis:14.2857%;max-width:14.2857%;height:42px;line-height:42px;margin:1px 0;border-radius:8px;font-size:14px}
+.flatpickr-calendar.admin-mobile-datepicker .flatpickr-day.today{border-color:var(--accent)}
+.flatpickr-calendar.admin-mobile-datepicker .flatpickr-day.selected,
+.flatpickr-calendar.admin-mobile-datepicker .flatpickr-day.startRange,
+.flatpickr-calendar.admin-mobile-datepicker .flatpickr-day.endRange{background:var(--accent);border-color:var(--accent);color:#111}
+.flatpickr-calendar.admin-mobile-datepicker .flatpickr-day.flatpickr-disabled{color:#555b64}
+@media(max-width:760px){
+  .flatpickr-calendar.admin-mobile-datepicker{display:block!important}
+  .flatpickr-calendar.admin-mobile-datepicker .flatpickr-innerContainer{overflow:visible}
+  .flatpickr-calendar.admin-mobile-datepicker .flatpickr-day{height:40px;line-height:40px}
+}
