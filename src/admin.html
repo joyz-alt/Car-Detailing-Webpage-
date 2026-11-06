@@ -18,6 +18,7 @@
     <div class="section-label">ESPACE PROFESSIONNEL</div>
     <h1>Planning & réservations</h1>
     <p class="admin-intro">Gérez vos demandes, corrigez les informations d’une réservation et enregistrez les paiements après la prestation. Les clients ne paient pas en ligne.</p>
+    <div class="admin-toolbar"><button class="btn btn-primary" id="openManualBooking" type="button">＋ Ajouter une prestation</button></div>
     <div class="admin-grid">
       <section class="admin-card">
         <h3>Bloquer un créneau</h3>
@@ -28,25 +29,6 @@
           <option>14:00</option><option>14:30</option><option>15:30</option><option>17:00</option>
         </select></label>
         <button class="btn btn-primary" id="blockBtn">Bloquer ce créneau</button>
-      </section>
-      <section class="admin-card admin-manual-booking">
-        <h3>Ajouter une prestation</h3>
-        <p class="empty">Créez une réservation directement depuis l’espace pro, y compris en dehors de la zone habituelle de 25 km. Les coordonnées du client sont facultatives.</p>
-        <form id="manualBookingForm"><div class="manual-booking-grid">
-          <label>Formule<select id="manualService" required><option value="Essentielle">Essentielle — 79 €</option><option value="Premium">Premium — 129 €</option></select></label>
-          <label>Date<input id="manualDate" type="date" required></label>
-          <label>Heure<select id="manualTime" required><option>08:00</option><option>09:00</option><option>10:00</option><option>13:00</option><option>14:00</option><option>15:00</option></select></label>
-          <label>Adresse d’intervention<input id="manualAddress" maxlength="300" placeholder="Adresse complète (facultatif)"></label>
-          <label>Prénom<input id="manualFirstName" maxlength="100" placeholder="Facultatif"></label>
-          <label>Nom<input id="manualLastName" maxlength="100" placeholder="Facultatif"></label>
-          <label>Téléphone<input id="manualPhone" type="tel" maxlength="40" placeholder="Facultatif"></label>
-          <label>E-mail<input id="manualEmail" type="email" maxlength="254" placeholder="Facultatif"></label>
-          <label>Véhicule<input id="manualVehicle" maxlength="100" placeholder="Facultatif"></label>
-          <label>Accès à l’eau<select id="manualWater"><option>Non renseigné</option><option>Oui</option><option>Non</option></select></label>
-          <label>Accès à l’électricité<select id="manualElectricity"><option>Non renseigné</option><option>Oui</option><option>Non</option></select></label>
-          <label class="manual-note">Précisions<textarea id="manualNote" rows="2" maxlength="1500" placeholder="Facultatif"></textarea></label>
-        </div><p class="form-help">La zone géographique est ignorée pour cette création manuelle. Les disponibilités et les chevauchements restent contrôlés.</p>
-        <button class="btn btn-primary" type="submit">Créer la prestation</button></form>
       </section>
       <section class="admin-card">
         <h3>Créneaux bloqués</h3>
@@ -91,6 +73,26 @@
       </section>
     </div>
   </main>
+  <div class="manual-booking-modal" id="manualBookingModal" hidden>      <section class="manual-booking-modal-panel" role="dialog" aria-modal="true" aria-labelledby="manualBookingTitle">
+        <div class="manual-booking-modal-heading"><div><div class="section-label">ESPACE PROFESSIONNEL</div><h2 id="manualBookingTitle">Ajouter une prestation</h2></div><button class="manual-modal-close" id="closeManualBooking" type="button" aria-label="Fermer">×</button></div>
+        <p class="empty">Renseignez les informations du rendez-vous. Les coordonnées du client sont facultatives.</p>
+        <form id="manualBookingForm"><div class="manual-booking-grid">
+          <label>Formule<select id="manualService" required><option value="Essentielle">Essentielle — 79 €</option><option value="Premium">Premium — 129 €</option></select></label>
+          <label>Date<input id="manualDate" type="date" required></label>
+          <label>Heure<select id="manualTime" required><option>08:00</option><option>09:00</option><option>10:00</option><option>13:00</option><option>14:00</option><option>15:00</option></select></label>
+          <label>Adresse d’intervention<input id="manualAddress" maxlength="300" placeholder="Adresse complète (facultatif)"></label>
+          <label>Prénom<input id="manualFirstName" maxlength="100" placeholder="Facultatif"></label>
+          <label>Nom<input id="manualLastName" maxlength="100" placeholder="Facultatif"></label>
+          <label>Téléphone<input id="manualPhone" type="tel" maxlength="40" placeholder="Facultatif"></label>
+          <label>E-mail<input id="manualEmail" type="email" maxlength="254" placeholder="Facultatif"></label>
+          <label>Véhicule<input id="manualVehicle" maxlength="100" placeholder="Facultatif"></label>
+          <label>Accès à l’eau<select id="manualWater"><option>Non renseigné</option><option>Oui</option><option>Non</option></select></label>
+          <label>Accès à l’électricité<select id="manualElectricity"><option>Non renseigné</option><option>Oui</option><option>Non</option></select></label>
+          <label class="manual-note">Précisions<textarea id="manualNote" rows="2" maxlength="1500" placeholder="Facultatif"></textarea></label>
+        </div>
+        <button class="btn btn-primary" type="submit">Créer la prestation</button></form>
+      </section>
+</div>
   <div class="admin-toast" id="adminToast" role="status" aria-live="polite"></div>
   <div class="admin-dialog-backdrop" id="adminDialog" hidden>
     <form class="admin-dialog" id="adminDialogForm" role="dialog" aria-modal="true" aria-labelledby="adminDialogTitle">

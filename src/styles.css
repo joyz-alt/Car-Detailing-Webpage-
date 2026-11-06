@@ -2608,3 +2608,15 @@ body {
 .manual-booking-grid .manual-note{grid-column:1/-1}
 .admin-manual-booking form>.form-help{margin:4px 0 16px}
 @media(max-width:620px){.manual-booking-grid{grid-template-columns:1fr}.manual-booking-grid .manual-note{grid-column:auto}}
+
+/* Compact manual-booking entry point and focused modal */
+.admin-toolbar{display:flex;justify-content:flex-end;margin:18px 0 22px}
+.manual-booking-modal{position:fixed;inset:0;z-index:1250;display:grid;place-items:center;padding:20px;background:rgba(0,0,0,.76);backdrop-filter:blur(5px);overflow-y:auto}
+.manual-booking-modal[hidden]{display:none}
+.manual-booking-modal-panel{width:min(720px,100%);max-height:min(90vh,900px);overflow-y:auto;padding:26px;border:1px solid var(--line);border-radius:8px;background:var(--panel);box-shadow:0 24px 80px rgba(0,0,0,.5)}
+.manual-booking-modal-heading{display:flex;justify-content:space-between;align-items:flex-start;gap:18px;margin-bottom:8px}
+.manual-booking-modal-heading h2{margin:7px 0 0;font-size:25px;color:var(--text)}
+.manual-modal-close{width:36px;height:36px;flex:0 0 36px;border:1px solid var(--line);border-radius:50%;background:var(--panel2);color:var(--text);font-size:24px;line-height:1;cursor:pointer}
+.manual-booking-modal .empty{margin:8px 0 18px}
+.manual-booking-modal .manual-booking-grid{margin:16px 0 20px}
+@media(max-width:620px){.admin-toolbar{justify-content:stretch}.admin-toolbar .btn{width:100%}.manual-booking-modal{padding:10px;align-items:start}.manual-booking-modal-panel{padding:20px 16px;max-height:calc(100vh - 20px)}.manual-booking-modal .manual-booking-grid{grid-template-columns:1fr}.manual-booking-modal .manual-note{grid-column:auto}}

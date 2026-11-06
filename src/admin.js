@@ -36,7 +36,7 @@ $('#adminDialogForm').addEventListener('submit', event => {
 });
 $('#adminDialogCancel').addEventListener('click', () => closeDialog(false));
 $('#adminDialog').addEventListener('click', event => { if (event.target === $('#adminDialog')) closeDialog(false); });
-document.addEventListener('keydown', event => { if (event.key === 'Escape' && !$('#adminDialog').hidden) closeDialog(false); });
+document.addEventListener('keydown', event => { if (event.key === 'Escape' && !$('#adminDialog').hidden) closeDialog(false); else if (event.key === 'Escape' && manualModal && !manualModal.hidden) closeManualBooking(); });
 
 function headers(json = false) {
   const h = {};
@@ -312,6 +312,12 @@ $('#blocks').addEventListener('click', async event => {
 });
 
 $('#manualDate').min = new Date().toISOString().slice(0, 10);
+const manualModal = $('#manualBookingModal');
+function openManualBooking() { manualModal.hidden = false; document.body.classList.add('dialog-open'); $('#manualService').focus(); }
+function closeManualBooking() { manualModal.hidden = true; document.body.classList.remove('dialog-open'); }
+$('#openManualBooking').addEventListener('click', openManualBooking);
+$('#closeManualBooking').addEventListener('click', closeManualBooking);
+manualModal.addEventListener('click', event => { if (event.target === manualModal) closeManualBooking(); });
 $('#manualService').addEventListener('change', () => {
   const times = $('#manualService').value === 'Premium' ? ['08:00', '09:00', '13:00', '14:00'] : ['08:00', '09:00', '10:00', '13:00', '14:00', '15:00'];
   $('#manualTime').innerHTML = times.map(time => '<option>' + time + '</option>').join('');
@@ -326,11 +332,12 @@ $('#manualBookingForm').addEventListener('submit', async event => {
     water: $('#manualWater').value, electricity: $('#manualElectricity').value, note: $('#manualNote').value
   };
   if (!payload.date) return showToast('Choisissez une date.', 'error');
-  if (!await showConfirm('Créer cette prestation manuellement ? La vérification du périmètre de 25 km sera ignorée, mais le créneau doit rester disponible.')) return;
+  if (!await showConfirm('Confirmer la création de cette prestation avec les informations saisies ?')) return;
   button.disabled = true;
   try {
     const result = await api('/api/admin/bookings', { method: 'POST', body: JSON.stringify(payload) });
     $('#manualBookingForm').reset(); $('#manualDate').min = new Date().toISOString().slice(0, 10);
+    closeManualBooking();
     await render(); showToast('Prestation créée' + (result.booking ? ' · ' + result.booking.id : '') + '.');
   } catch (e) { showToast(e.message, 'error'); }
   finally { button.disabled = false; }
