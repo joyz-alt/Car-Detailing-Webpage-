@@ -227,6 +227,24 @@ test('admin can edit a booking while preserving payment state and rejects unauth
 });
 
 
+
+test('admin can create a manual booking outside the service radius with optional customer details', async () => {
+  const manualDate = new Date(); manualDate.setUTCDate(manualDate.getUTCDate() + 42);
+  const date = manualDate.toISOString().slice(0, 10), endpoint = baseUrl + '/api/admin/bookings';
+  const denied = await fetch(endpoint, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ service: 'Essentielle', date, time: '08:00' }) });
+  assert.equal(denied.status, 401);
+  const response = await fetch(endpoint, { method: 'POST', headers: { 'x-admin-key': adminKey, 'content-type': 'application/json' },
+    body: JSON.stringify({ service: 'Essentielle', date, time: '08:00', address: 'Adresse hors zone' }) });
+  const payload = await response.json();
+  assert.equal(response.status, 201, JSON.stringify(payload)); assert.equal(payload.booking.status, 'pending');
+  assert.equal(payload.booking.firstName, 'Non renseigné'); assert.equal(payload.booking.email, '');
+  const stored = await pool.query('SELECT first_name, last_name, phone, email, address, amount_eur, status FROM bookings WHERE id = $1', [payload.booking.id]);
+  assert.equal(stored.rowCount, 1); assert.equal(stored.rows[0].first_name, 'Non renseigné');
+  assert.equal(stored.rows[0].last_name, 'Non renseigné'); assert.equal(stored.rows[0].phone, 'Non renseigné');
+  assert.equal(stored.rows[0].email, ''); assert.equal(stored.rows[0].address, 'Adresse hors zone');
+  assert.equal(Number(stored.rows[0].amount_eur), 79); assert.equal(stored.rows[0].status, 'pending');
+});
+
 test('manual payment requires customer agreement and records itemized receipt details', async () => {
   const endpoint = baseUrl + '/api/admin/bookings/' + encodeURIComponent(firstBookingId) + '/payment';
   const headers = { 'x-admin-key': adminKey, 'content-type': 'application/json' };
