@@ -81,7 +81,7 @@ function renderEditForm(r) {
     '<label>Prénom<input data-field="firstName" value="' + escapeHtml(r.firstName) + '" maxlength="100" required></label>' +
     '<label>Nom<input data-field="lastName" value="' + escapeHtml(r.lastName) + '" maxlength="100" required></label>' +
     '<label>Téléphone<input data-field="phone" value="' + escapeHtml(r.phone) + '" maxlength="40" required></label>' +
-    '<label>E-mail<input data-field="email" type="email" value="' + escapeHtml(r.email) + '" maxlength="254" required></label>' +
+    '<label>E-mail<input data-field="email" type="email" value="' + escapeHtml(r.email) + '" maxlength="254"></label>' +
     '<label>Adresse<input data-field="address" value="' + escapeHtml(r.address) + '" maxlength="300" required></label>' +
     '<label>Véhicule<input data-field="vehicle" value="' + escapeHtml(r.vehicle || '') + '" maxlength="100"></label>' +
     '<label>Eau<select data-field="water"><option value="Non renseigné">Non renseigné</option><option value="Oui">Oui</option><option value="Non">Non</option></select></label>' +
