@@ -160,6 +160,16 @@ function getTransporter() {
   });
 }
 
+function htmlToPlainText(html) {
+  return String(html || '')
+    .replace(/<br\\s*\\/?\\s*>/gi, '\\n')
+    .replace(/<\\/(p|div|h[1-6]|li|tr)>/gi, '\\n')
+    .replace(/<li>/gi, '• ')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'")
+    .replace(/[ \\t]+\\n/g, '\\n').replace(/\\n{3,}/g, '\\n\\n').trim();
+}
 async function deliverEmail(message) {
   const provider = getEmailProvider();
   if (!provider) throw new Error('Email provider is not configured. Set RESEND_API_KEY and MAIL_FROM, or SMTP settings.');
@@ -175,7 +185,8 @@ async function deliverEmail(message) {
         from: process.env.MAIL_FROM,
         to: [message.recipient],
         subject: message.subject,
-        html: message.htmlBody
+        html: message.htmlBody,
+        text: message.textBody || htmlToPlainText(message.htmlBody)
       }),
       signal: AbortSignal.timeout(15000)
     });
@@ -193,7 +204,8 @@ async function deliverEmail(message) {
     from: process.env.MAIL_FROM || process.env.SMTP_USER,
     to: message.recipient,
     subject: message.subject,
-    html: message.htmlBody
+    html: message.htmlBody,
+    text: message.textBody || htmlToPlainText(message.htmlBody)
   });
 }
 
@@ -659,8 +671,24 @@ app.post('/api/bookings', bookingRateLimit, (req, res, next) => {
       dedupeKey: 'booking:' + id + ':request-received-customer',
       bookingId: id,
       recipient: email,
-      subject: 'Épure Auto — demande de réservation reçue',
-      htmlBody: '<p>Bonjour ' + escapeHtml(firstName) + ',</p><p>Nous avons bien reçu votre demande pour la prestation <strong>' + escapeHtml(service) + '</strong> le <strong>' + escapeHtml(date) + '</strong> à <strong>' + escapeHtml(time) + '</strong>.</p><p>Nous vous recontacterons pour confirmer les détails du rendez-vous. Aucun paiement n’est demandé sur le site : le règlement aura lieu après le nettoyage, une fois le montant final convenu.</p><p>Si vous ne voyez pas cet e-mail dans votre boîte de réception, vérifiez vos courriers indésirables (spam).</p><p>À bientôt,<br>Épure Auto</p>'
+      subject: 'Votre demande de rendez-vous a bien été reçue | Épure Auto',
+      htmlBody: '<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>' +
+        '<body style="margin:0;padding:24px 12px;background:#f3f4f5;font-family:Arial,Helvetica,sans-serif;color:#202329;">' +
+        '<div style="display:none;max-height:0;overflow:hidden;opacity:0;">Merci pour votre demande. Nous revenons vers vous très prochainement pour confirmer votre rendez-vous.</div>' +
+        '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:600px;margin:auto;background:#fff;border-radius:12px;overflow:hidden;">' +
+        '<tr><td style="background:#101317;padding:28px;text-align:center;"><div style="font-size:23px;font-weight:bold;letter-spacing:3px;color:#fff;">ÉPURE AUTO<span style="color:#c6a779;">.</span></div><div style="margin-top:8px;font-size:11px;letter-spacing:2px;color:#c6a779;">LE SOIN DU DÉTAIL</div></td></tr>' +
+        '<tr><td style="padding:32px;"><div style="font-size:11px;font-weight:bold;letter-spacing:1.5px;color:#a17d4d;">DEMANDE BIEN REÇUE</div>' +
+        '<h1 style="margin:12px 0 18px;font-size:25px;color:#202329;">Bonjour ' + escapeHtml(firstName) + ' !</h1>' +
+        '<p style="font-size:15px;line-height:1.7;color:#4d535b;">Merci d’avoir choisi Épure Auto. Nous sommes ravis que vous nous confiiez le soin de votre véhicule.</p>' +
+        '<p style="font-size:15px;line-height:1.7;color:#4d535b;">Votre demande a bien été enregistrée. Nous allons vérifier les derniers détails et reviendrons vers vous rapidement pour vous confirmer le rendez-vous.</p>' +
+        '<div style="margin:24px 0;padding:20px;border:1px solid #e8e5df;border-radius:8px;background:#faf9f7;"><div style="margin-bottom:14px;font-size:11px;font-weight:bold;letter-spacing:1.4px;color:#a17d4d;">VOTRE DEMANDE</div>' +
+        '<p style="font-size:14px;line-height:1.7;color:#4d535b;"><strong style="color:#202329;">Prestation</strong><br>' + escapeHtml(service) + '<br><strong style="color:#202329;">Date souhaitée</strong><br>' + escapeHtml(date) + '<br><strong style="color:#202329;">Horaire souhaité</strong><br>' + escapeHtml(time) + '</p></div>' +
+        '<div style="margin:24px 0;padding:16px 18px;border-left:3px solid #c6a779;background:#f8f6f2;"><p style="margin:0;font-size:14px;line-height:1.7;color:#4d535b;"><strong style="color:#202329;">En toute simplicité :</strong> aucun paiement n’est demandé lors de la réservation. Vous réglerez après la prestation, une fois le nettoyage terminé et le montant final convenu ensemble.</p></div>' +
+        '<p style="font-size:14px;line-height:1.7;color:#4d535b;">Une question ou une précision à nous transmettre ? Vous pouvez simplement répondre à cet e-mail.</p>' +
+        '<p style="margin-top:22px;font-size:15px;line-height:1.7;color:#202329;">À très bientôt,<br><strong>L’équipe Épure Auto</strong></p></td></tr>' +
+        '<tr><td style="padding:22px;background:#101317;text-align:center;color:#c4c7cb;font-size:12px;line-height:1.7;">Nettoyage intérieur automobile à domicile<br>Angoulême et alentours<br><a href="https://epure-auto.com" style="color:#fff;">epure-auto.com</a></td></tr></table>' +
+        '<p style="max-width:560px;margin:16px auto;font-size:11px;line-height:1.6;color:#858b92;text-align:center;">Cet e-mail confirme la bonne réception de votre demande. Votre rendez-vous sera définitif après notre confirmation.</p></body></html>',
+      textBody: 'Bonjour ' + firstName + ' !\n\nMerci d’avoir choisi Épure Auto. Nous sommes ravis que vous nous confiiez le soin de votre véhicule.\n\nVotre demande a bien été enregistrée. Nous allons vérifier les derniers détails et reviendrons vers vous rapidement pour vous confirmer le rendez-vous.\n\nVOTRE DEMANDE\nPrestation : ' + service + '\nDate souhaitée : ' + date + '\nHoraire souhaité : ' + time + '\n\nAucun paiement n’est demandé lors de la réservation. Vous réglerez après la prestation, une fois le nettoyage terminé et le montant final convenu ensemble.\n\nUne question ou une précision ? Vous pouvez simplement répondre à cet e-mail.\n\nÀ très bientôt,\nL’équipe Épure Auto\nNettoyage intérieur automobile à domicile — Angoulême et alentours\nhttps://epure-auto.com\n\nCet e-mail confirme la bonne réception de votre demande. Votre rendez-vous sera définitif après notre confirmation.'
     });
     await client.query('COMMIT');
   } catch (e) {
