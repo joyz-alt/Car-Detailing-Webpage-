@@ -72,13 +72,21 @@ function initAdminDatePickers(root = document) {
       locale: 'fr',
       dateFormat: 'Y-m-d',
       altInput: true,
-      altFormat: 'j F Y',
+      altFormat: 'd/m/Y',
       minDate: (input.id === 'manualDate' || input.id === 'blockDate') ? 'today' : null,
       disableMobile: true,
-      allowInput: true,
+      allowInput: false,
       monthSelectorType: isMobile ? 'dropdown' : 'static',
       showMonths: 1,
       position: 'auto',
+      onReady: (selectedDates, dateStr, instance) => {
+        if (instance.altInput) {
+          instance.altInput.placeholder = 'dd/mm/yyyy';
+          instance.altInput.readOnly = true;
+          instance.altInput.setAttribute('inputmode', 'none');
+          instance.altInput.setAttribute('aria-label', 'Choisir une date au format jour, mois, année');
+        }
+      },
       onOpen: (selectedDates, dateStr, instance) => {
         instance.calendarContainer.classList.toggle('admin-mobile-datepicker', window.matchMedia('(max-width: 760px)').matches);
       }
