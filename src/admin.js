@@ -27,6 +27,10 @@ function escapeHtml(value) {
 function labelStatus(s) {
   return { pending: 'En attente', confirmed: 'Payé', declined: 'Refusé' }[s] || s;
 }
+function formatBookingDate(value) {
+  const date = new Date(value + 'T12:00:00');
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString('fr-FR');
+}
 function serviceOptions(selected, disabled = false) {
   const options = Object.keys(SERVICE_PRICES).map(name =>
     '<option value="' + name + '"' + (selected === name ? ' selected' : '') + '>' + name + ' — ' + SERVICE_PRICES[name] + ' €</option>'
@@ -108,7 +112,7 @@ function applyBookingFilters() {
   }
   box.innerHTML = pageRows.map(r =>
     '<tr class="booking-table-row">' +
-    '<td><strong>' + escapeHtml(r.date) + '</strong><br>' + escapeHtml(r.time) + '</td>' +
+    '<td><strong>' + escapeHtml(formatBookingDate(r.date)) + '</strong><br>' + escapeHtml(r.time) + '</td>' +
     '<td><strong>' + escapeHtml(r.firstName) + ' ' + escapeHtml(r.lastName) + '</strong><br><span class="table-subtext">' + escapeHtml(r.phone) + '</span></td>' +
     '<td>' + escapeHtml(r.service) + '</td><td><strong>' + escapeHtml(r.amount) + ' €</strong></td>' +
     '<td><span class="status status-' + escapeHtml(r.status) + '">' + escapeHtml(labelStatus(r.status)) + '</span></td>' +
