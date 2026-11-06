@@ -66,6 +66,14 @@
       </section>
     </div>
   </main>
+  <div class="admin-toast" id="adminToast" role="status" aria-live="polite"></div>
+  <div class="admin-dialog-backdrop" id="adminDialog" hidden>
+    <form class="admin-dialog" id="adminDialogForm" role="dialog" aria-modal="true" aria-labelledby="adminDialogTitle">
+      <div class="section-label">ÉPURE AUTO</div><h2 id="adminDialogTitle">Confirmer</h2><p id="adminDialogMessage"></p>
+      <input id="adminDialogInput" class="admin-dialog-input" type="password" autocomplete="current-password" hidden>
+      <div class="admin-dialog-actions"><button class="btn btn-secondary" id="adminDialogCancel" type="button">Annuler</button><button class="btn btn-primary" id="adminDialogConfirm" type="submit">Confirmer</button></div>
+    </form>
+  </div>
   <script src="admin.js"></script>
 </body>
 </html>
