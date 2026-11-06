@@ -509,7 +509,7 @@ app.get('/api/next-availability', availabilityRateLimit, asyncHandler(async (req
       byDate.get(block.date).blocks.push({ start, end: start + 60 });
     }
 
-    const duration = SERVICES[service].durationMinutes + BUFFER_MINUTES;
+    const duration = (serviceDetails ? serviceDetails.durationMinutes : Number(booking.durationMinutes)) + BUFFER_MINUTES;
     const days = [];
     for (let offset = 0; offset < 7; offset++) {
       const dateObject = new Date(monday);
@@ -752,11 +752,13 @@ app.patch('/api/admin/bookings/:id', adminGuard, asyncHandler(async (req, res) =
     const condition = text(body.condition == null ? booking.condition : body.condition, 100) || 'Non renseigné';
     const note = text(body.note == null ? booking.note : body.note, 1500);
 
-    if (!SERVICES[service]) {
+    const serviceDetails = SERVICES[service] || null;
+    if (!serviceDetails && service !== booking.service) {
       await client.query('ROLLBACK');
-      return res.status(400).json({ error: 'Choisissez une formule valide.' });
+      return res.status(400).json({ error: 'Choisissez une formule actuelle valide.' });
     }
-    if (!isValidDate(date) || date < parisToday() || !SLOT_RULES[service].includes(time)) {
+    const validTime = serviceDetails ? SLOT_RULES[service].includes(time) : SLOTS.includes(time);
+    if (!isValidDate(date) || date < parisToday() || !validTime) {
       await client.query('ROLLBACK');
       return res.status(400).json({ error: 'La date ou l’heure ne correspond pas à un créneau proposé pour cette formule.' });
     }
@@ -804,11 +806,13 @@ app.patch('/api/admin/bookings/:id', adminGuard, asyncHandler(async (req, res) =
     await client.query(
       'UPDATE bookings SET service = $2, booking_date = $3, booking_time = $4, first_name = $5, last_name = $6, ' +
       'phone = $7, email = $8, address = $9, vehicle = $10, water = $11, electricity = $12, vehicle_condition = $13, note = $14, ' +
-      'amount_eur = CASE WHEN status = \'pending\' THEN $15 ELSE amount_eur END, ' +
-      'duration_minutes = CASE WHEN status = \'pending\' THEN $16 ELSE duration_minutes END, ' +
-      'duration_label = CASE WHEN status = \'pending\' THEN $17 ELSE duration_label END WHERE id = $1',
+      'amount_eur = CASE WHEN status = \'pending\' AND $18 THEN $15 ELSE amount_eur END, ' +
+      'duration_minutes = CASE WHEN status = \'pending\' AND $18 THEN $16 ELSE duration_minutes END, ' +
+      'duration_label = CASE WHEN status = \'pending\' AND $18 THEN $17 ELSE duration_label END WHERE id = $1',
       [booking.id, service, date, time, firstName, lastName, phone, email, address, vehicle, water, electricity, condition, note,
-        SERVICES[service].amount, SERVICES[service].durationMinutes, SERVICES[service].durationLabel]
+        serviceDetails ? serviceDetails.amount : booking.amount,
+        serviceDetails ? serviceDetails.durationMinutes : booking.durationMinutes,
+        serviceDetails ? serviceDetails.durationLabel : booking.duration, Boolean(serviceDetails)]
     );
     await client.query('COMMIT');
     res.json({ ok: true });
