@@ -509,7 +509,7 @@ app.get('/api/next-availability', availabilityRateLimit, asyncHandler(async (req
       byDate.get(block.date).blocks.push({ start, end: start + 60 });
     }
 
-    const duration = (serviceDetails ? serviceDetails.durationMinutes : Number(booking.durationMinutes)) + BUFFER_MINUTES;
+    const duration = SERVICES[service].durationMinutes + BUFFER_MINUTES;
     const days = [];
     for (let offset = 0; offset < 7; offset++) {
       const dateObject = new Date(monday);
@@ -785,7 +785,7 @@ app.patch('/api/admin/bookings/:id', adminGuard, asyncHandler(async (req, res) =
         return res.status(409).json({ error: 'Une autre prestation Premium est déjà prévue ce jour-là.' });
       }
     }
-    const duration = SERVICES[service].durationMinutes + BUFFER_MINUTES;
+    const duration = (serviceDetails ? serviceDetails.durationMinutes : Number(booking.durationMinutes)) + BUFFER_MINUTES;
     const overlap = await client.query(
       'SELECT 1 FROM bookings WHERE id <> $1 AND booking_date = $2 AND status = ANY($3::text[]) ' +
       'AND booking_time < ($4::time + ($5 * interval \'1 minute\')) ' +
