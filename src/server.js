@@ -658,14 +658,36 @@ app.post('/api/bookings', bookingRateLimit, (req, res, next) => {
       dedupeKey: 'booking:' + id + ':new-request-owner',
       bookingId: id,
       recipient: ADMIN_EMAIL,
-      subject: 'Épure Auto — nouvelle demande ' + id,
-      htmlBody: '<h2>Nouvelle demande de réservation</h2><p><strong>' + escapeHtml(firstName) + ' ' + escapeHtml(lastName) +
-        '</strong><br>' + escapeHtml(phone) + '<br>' + escapeHtml(email) + '</p><p><strong>' + escapeHtml(service) +
-        '</strong> · ' + escapeHtml(vehicle) + '<br>' + escapeHtml(date) + ' à ' + escapeHtml(time) + '<br>' +
-        escapeHtml(address) + '</p><p>Eau : <strong>' + escapeHtml(water) + '</strong><br>Électricité : <strong>' +
-        escapeHtml(electricity) + '</strong><br>État : <strong>' + escapeHtml(condition) + '</strong></p><p>Photos : ' +
-        photos.length + '</p>' + (note ? '<p>Note : ' + escapeHtml(note) + '</p>' : '') +
-        '<p><a href="' + escapeHtml(publicBaseUrl()) + '/admin.html">Ouvrir l’espace pro</a></p>'
+      subject: 'Nouvelle réservation — ' + firstName + ' ' + lastName + ' — ' + date,
+      htmlBody: '<!doctype html><html lang="fr"><head><meta charset="utf-8"></head>' +
+        '<body style="margin:0;padding:24px 12px;background:#f3f4f5;font-family:Arial,Helvetica,sans-serif;color:#202329;">' +
+        '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:640px;margin:auto;background:#fff;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;">' +
+        '<tr><td style="padding:22px 26px;background:#101317;color:#fff;"><div style="font-size:18px;font-weight:700;letter-spacing:2px;">ÉPURE AUTO</div><div style="margin-top:6px;color:#c6a779;font-size:12px;">NOUVELLE DEMANDE DE RÉSERVATION</div></td></tr>' +
+        '<tr><td style="padding:22px 26px 8px;"><div style="font-size:12px;color:#68707a;">RÉFÉRENCE : <strong style="color:#202329;">' + escapeHtml(id) + '</strong></div>' +
+        '<h1 style="margin:8px 0 4px;font-size:23px;">' + escapeHtml(firstName) + ' ' + escapeHtml(lastName) + '</h1>' +
+        '<p style="margin:0;color:#68707a;font-size:13px;">Demande reçue — en attente de traitement</p></td></tr>' +
+        '<tr><td style="padding:14px 26px;"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;">' +
+        '<tr><td colspan="2" style="padding:10px 12px;background:#f5f3ef;font-size:12px;font-weight:700;letter-spacing:1px;">RENDEZ-VOUS SOUHAITÉ</td></tr>' +
+        '<tr><td style="padding:12px;border-bottom:1px solid #eceef0;color:#68707a;width:38%;">Date et heure</td><td style="padding:12px;border-bottom:1px solid #eceef0;font-weight:700;">' + escapeHtml(date) + ' à ' + escapeHtml(time) + '</td></tr>' +
+        '<tr><td style="padding:12px;border-bottom:1px solid #eceef0;color:#68707a;">Prestation</td><td style="padding:12px;border-bottom:1px solid #eceef0;font-weight:700;">' + escapeHtml(service) + '</td></tr>' +
+        '<tr><td style="padding:12px;border-bottom:1px solid #eceef0;color:#68707a;">Montant prévu</td><td style="padding:12px;border-bottom:1px solid #eceef0;font-weight:700;">' + escapeHtml(details.amount) + ' €</td></tr>' +
+        '<tr><td style="padding:12px;border-bottom:1px solid #eceef0;color:#68707a;">Durée estimée</td><td style="padding:12px;border-bottom:1px solid #eceef0;">' + escapeHtml(details.durationLabel) + '</td></tr>' +
+        '<tr><td style="padding:12px;color:#68707a;">Véhicule</td><td style="padding:12px;">' + escapeHtml(vehicle) + '</td></tr></table></td></tr>' +
+        '<tr><td style="padding:8px 26px 14px;"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;">' +
+        '<tr><td colspan="2" style="padding:10px 12px;background:#f5f3ef;font-size:12px;font-weight:700;letter-spacing:1px;">COORDONNÉES DU CLIENT</td></tr>' +
+        '<tr><td style="padding:12px;border-bottom:1px solid #eceef0;color:#68707a;width:38%;">Téléphone</td><td style="padding:12px;border-bottom:1px solid #eceef0;"><a href="tel:' + escapeHtml(phone) + '" style="color:#202329;">' + escapeHtml(phone) + '</a></td></tr>' +
+        '<tr><td style="padding:12px;border-bottom:1px solid #eceef0;color:#68707a;">E-mail</td><td style="padding:12px;border-bottom:1px solid #eceef0;"><a href="mailto:' + escapeHtml(email) + '" style="color:#202329;">' + escapeHtml(email) + '</a></td></tr>' +
+        '<tr><td style="padding:12px;color:#68707a;">Adresse</td><td style="padding:12px;">' + escapeHtml(address) + '</td></tr></table></td></tr>' +
+        '<tr><td style="padding:8px 26px 18px;"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;">' +
+        '<tr><td colspan="2" style="padding:10px 12px;background:#f5f3ef;font-size:12px;font-weight:700;letter-spacing:1px;">INFORMATIONS PRATIQUES</td></tr>' +
+        '<tr><td style="padding:10px 12px;border-bottom:1px solid #eceef0;color:#68707a;width:38%;">Accès à l’eau</td><td style="padding:10px 12px;border-bottom:1px solid #eceef0;">' + escapeHtml(water) + '</td></tr>' +
+        '<tr><td style="padding:10px 12px;border-bottom:1px solid #eceef0;color:#68707a;">Électricité</td><td style="padding:10px 12px;border-bottom:1px solid #eceef0;">' + escapeHtml(electricity) + '</td></tr>' +
+        '<tr><td style="padding:10px 12px;border-bottom:1px solid #eceef0;color:#68707a;">État du véhicule</td><td style="padding:10px 12px;border-bottom:1px solid #eceef0;">' + escapeHtml(condition) + '</td></tr>' +
+        '<tr><td style="padding:10px 12px;color:#68707a;">Photos jointes</td><td style="padding:10px 12px;">' + photos.length + '</td></tr></table></td></tr>' +
+        (note ? '<tr><td style="padding:0 26px 18px;"><div style="padding:14px 16px;background:#fffaf0;border-left:3px solid #c6a779;"><div style="margin-bottom:6px;font-size:11px;font-weight:700;letter-spacing:1px;color:#8a6a3e;">NOTE DU CLIENT</div><div style="font-size:14px;line-height:1.6;">' + escapeHtml(note) + '</div></div></td></tr>' : '') +
+        '<tr><td style="padding:18px 26px 24px;"><a href="' + escapeHtml(publicBaseUrl()) + '/admin.html" style="display:inline-block;padding:12px 18px;background:#101317;color:#fff;text-decoration:none;border-radius:5px;font-size:13px;font-weight:700;">OUVRIR L’ESPACE PRO</a></td></tr>' +
+        '</table><p style="max-width:640px;margin:12px auto 0;color:#8a9098;font-size:11px;text-align:center;">Notification automatique Épure Auto</p></body></html>',
+      textBody: 'NOUVELLE DEMANDE DE RÉSERVATION\nRéférence : ' + id + '\nStatut : En attente de traitement\n\nRENDEZ-VOUS SOUHAITÉ\nDate et heure : ' + date + ' à ' + time + '\nPrestation : ' + service + '\nMontant prévu : ' + details.amount + ' €\nDurée estimée : ' + details.durationLabel + '\nVéhicule : ' + vehicle + '\n\nCOORDONNÉES DU CLIENT\nNom : ' + firstName + ' ' + lastName + '\nTéléphone : ' + phone + '\nE-mail : ' + email + '\nAdresse : ' + address + '\n\nINFORMATIONS PRATIQUES\nAccès à l’eau : ' + water + '\nÉlectricité : ' + electricity + '\nÉtat du véhicule : ' + condition + '\nPhotos jointes : ' + photos.length + (note ? '\n\nNOTE DU CLIENT\n' + note : '') + '\n\nEspace pro : ' + publicBaseUrl() + '/admin.html'
     });
     await enqueueEmail(client, {
       dedupeKey: 'booking:' + id + ':request-received-customer',
