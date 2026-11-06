@@ -2569,3 +2569,14 @@ body {
 
 .booking-pagination { display:flex; align-items:center; justify-content:center; gap:16px; padding:16px 0 4px; font-size:12px; color:var(--muted); }
 .booking-pagination button:disabled { opacity:.4; cursor:not-allowed; }
+
+
+/* Custom admin dialogs and notifications. */
+.admin-toast{position:fixed;z-index:1200;right:22px;bottom:22px;max-width:min(420px,calc(100vw - 32px));padding:14px 18px;border:1px solid var(--line);border-radius:6px;background:var(--panel2);color:var(--text);box-shadow:0 12px 36px rgba(0,0,0,.35);opacity:0;pointer-events:none;transform:translateY(10px);transition:opacity .2s ease,transform .2s ease;font-size:13px;line-height:1.5}
+.admin-toast.is-visible{opacity:1;transform:translateY(0)}.admin-toast.is-success{border-color:rgba(184,154,106,.65)}.admin-toast.is-error{border-color:rgba(255,125,125,.65)}
+.admin-dialog-backdrop{position:fixed;inset:0;z-index:1300;display:grid;place-items:center;padding:20px;background:rgba(0,0,0,.72);backdrop-filter:blur(4px)}
+.admin-dialog-backdrop[hidden]{display:none}.admin-dialog{width:min(460px,100%);padding:28px;border:1px solid var(--line);border-radius:8px;background:var(--panel);box-shadow:0 24px 80px rgba(0,0,0,.5)}
+.admin-dialog h2{margin:8px 0 12px;color:var(--text);font-size:23px}.admin-dialog p{margin:0 0 20px;color:var(--muted);font-size:14px;line-height:1.65}
+.admin-dialog-input{display:block;width:100%;margin:0 0 20px;padding:12px 14px;border:1px solid var(--line);border-radius:4px;background:var(--panel2);color:var(--text);font:inherit}
+.admin-dialog-input[hidden]{display:none}.admin-dialog-actions{display:flex;justify-content:flex-end;gap:10px}body.dialog-open{overflow:hidden}
+@media(max-width:520px){.admin-dialog{padding:22px}.admin-dialog-actions{flex-direction:column-reverse}.admin-dialog-actions button{width:100%}.admin-toast{left:16px;right:16px;bottom:16px;max-width:none}}
