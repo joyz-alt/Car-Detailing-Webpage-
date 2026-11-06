@@ -2486,6 +2486,15 @@ body {
 .availability-week-nav .btn { min-width: 42px; padding: 9px; }
 .availability-week-nav .btn:disabled { opacity: .3; cursor: default; }
 .availability-week {
+  transition: opacity .18s ease, filter .18s ease;
+}
+.availability-week.is-loading {
+  opacity: .58;
+  filter: saturate(.72);
+  pointer-events: none;
+  cursor: progress;
+}
+.availability-week {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
