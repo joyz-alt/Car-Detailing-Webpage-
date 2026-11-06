@@ -1,250 +1,261 @@
 const $ = s => document.querySelector(s);
 let ADMIN_KEY = localStorage.getItem('epure_admin_key') || '';
+let ALL_BOOKINGS = [];
+const SERVICE_PRICES = { Essentielle: 79, Premium: 129 };
 function headers(json = false) {
   const h = {};
-
-  if (json)
-    h['Content-Type'] = 'application/json';
-
-  if (ADMIN_KEY)
-    h['x-admin-key'] = ADMIN_KEY;
+  if (json) h['Content-Type'] = 'application/json';
+  if (ADMIN_KEY) h['x-admin-key'] = ADMIN_KEY;
   return h;
 }
-
 async function api(url, opts = {}) {
   const r = await fetch(url, { ...opts, headers: { ...headers(!!opts.body), ...(opts.headers || {}) } });
   const d = await r.json().catch(() => ({}));
-
   if (!r.ok) {
-    if (r.status === 401) {
-      localStorage.removeItem('epure_admin_key');
-      ADMIN_KEY = '';
-    }
+    if (r.status === 401) { localStorage.removeItem('epure_admin_key'); ADMIN_KEY = ''; }
     throw new Error(d.error || 'Erreur serveur');
   }
   return d;
 }
-
 function escapeHtml(value) {
   return String(value == null ? '' : value).replace(/[&<>"']/g, c => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
   })[c]);
 }
-
-function renderBookings(rs) {
+function labelStatus(s) {
+  return { pending: 'En attente', confirmed: 'Payé', declined: 'Refusé' }[s] || s;
+}
+function serviceOptions(selected, disabled = false) {
+  const options = Object.keys(SERVICE_PRICES).map(name =>
+    '<option value="' + name + '"' + (selected === name ? ' selected' : '') + '>' + name + ' — ' + SERVICE_PRICES[name] + ' €</option>'
+  );
+  if (!SERVICE_PRICES[selected]) options.unshift('<option selected value="' + escapeHtml(selected) + '">' + escapeHtml(selected) + ' (ancienne formule)</option>');
+  return '<select data-field="service"' + (disabled ? ' disabled' : '') + '>' + options.join('') + '</select>';
+}
+function renderEditForm(r) {
+  return '<form class="booking-edit-form" data-edit-form="' + escapeHtml(r.id) + '">' +
+    '<div class="edit-grid">' +
+    '<label>Formule' + serviceOptions(r.service, r.status === 'confirmed') + '</label>' +
+    '<label>Date<input data-field="date" type="date" value="' + escapeHtml(r.date) + '" required></label>' +
+    '<label>Heure<input data-field="time" type="time" value="' + escapeHtml(r.time) + '" required></label>' +
+    '<label>Prénom<input data-field="firstName" value="' + escapeHtml(r.firstName) + '" maxlength="100" required></label>' +
+    '<label>Nom<input data-field="lastName" value="' + escapeHtml(r.lastName) + '" maxlength="100" required></label>' +
+    '<label>Téléphone<input data-field="phone" value="' + escapeHtml(r.phone) + '" maxlength="40" required></label>' +
+    '<label>E-mail<input data-field="email" type="email" value="' + escapeHtml(r.email) + '" maxlength="254" required></label>' +
+    '<label>Adresse<input data-field="address" value="' + escapeHtml(r.address) + '" maxlength="300" required></label>' +
+    '<label>Véhicule<input data-field="vehicle" value="' + escapeHtml(r.vehicle || '') + '" maxlength="100"></label>' +
+    '<label>Eau<select data-field="water"><option value="Non renseigné">Non renseigné</option><option value="Oui">Oui</option><option value="Non">Non</option></select></label>' +
+    '<label>Électricité<select data-field="electricity"><option value="Non renseigné">Non renseigné</option><option value="Oui">Oui</option><option value="Non">Non</option></select></label>' +
+    '<label>État du véhicule<input data-field="condition" value="' + escapeHtml(r.condition || '') + '" maxlength="100"></label>' +
+    '<label class="edit-note">Précisions<textarea data-field="note" rows="3" maxlength="1500">' + escapeHtml(r.note || '') + '</textarea></label>' +
+    '</div><div class="admin-actions"><button class="btn btn-primary btn-small" type="submit">Enregistrer les modifications</button>' +
+    '<button class="btn btn-secondary btn-small" type="button" data-action="cancel-edit">Annuler</button></div>' +
+    '<p class="empty edit-warning">' + (r.status === 'confirmed' ? 'La formule est verrouillée pour préserver la cohérence du reçu déjà émis.' : 'La modification de la date et de l’heure est vérifiée contre les autres réservations et les créneaux bloqués.') + '</p>' +
+    '</form>';
+}
+function renderBookingDetails(r) {
+  const photos = (r.photos || []).filter(p => p && p.url).map(p =>
+    '<a href="' + escapeHtml(p.url) + '" target="_blank" rel="noopener noreferrer"><img src="' + escapeHtml(p.url) +
+    '" alt="Photo du véhicule" loading="lazy"></a>').join('');
+  const paymentItems = Array.isArray(r.paymentItems) ? r.paymentItems : [];
+  const receipt = r.status === 'confirmed'
+    ? '<div class="payment-receipt"><strong>Règlement enregistré : ' + escapeHtml(r.amount) + ' €</strong><br>Mode : ' +
+      escapeHtml(r.paymentMethod === 'card' ? 'Carte bancaire' : r.paymentMethod === 'cash' ? 'Espèces' : 'Non renseigné') +
+      (paymentItems.length ? '<ul>' + paymentItems.map(item => '<li>' + escapeHtml(item.name) + ' : ' + escapeHtml(item.amount) + ' €</li>').join('') + '</ul>' : '') + '</div>' : '';
+  const paymentForm = r.status === 'pending'
+    ? '<div class="payment-config"><h4>Enregistrer le paiement après la prestation</h4>' +
+      '<label>Formule finale' + serviceOptions(r.service) + '</label>' +
+      '<label>Suppléments (une ligne par extra : intitulé | prix en €)<textarea data-field="addons" rows="3" placeholder="Poils d’animaux | 20&#10;Traitement des taches | 15"></textarea></label>' +
+      '<label>Mode de règlement<select data-field="paymentMethod"><option value="card">Carte bancaire</option><option value="cash">Espèces</option></select></label>' +
+      '<small class="empty">Enregistrez uniquement après avoir réellement reçu le règlement et obtenu l’accord du client sur la formule et les suppléments.</small>' +
+      '<button class="btn btn-primary btn-small" data-action="payment" data-id="' + escapeHtml(r.id) + '">Enregistrer le paiement et envoyer le reçu</button>' +
+      '<button class="btn btn-secondary btn-small" data-action="decline" data-id="' + escapeHtml(r.id) + '">Refuser la demande</button></div>' : '';
+  return '<div class="booking-detail-layout"><div class="booking-detail-info">' +
+    '<p><strong>Contact :</strong> ' + escapeHtml(r.phone) + ' · ' + escapeHtml(r.email) + '</p>' +
+    '<p><strong>Adresse :</strong> ' + escapeHtml(r.address) + '</p>' +
+    '<p><strong>Véhicule :</strong> ' + escapeHtml(r.vehicle || 'Non renseigné') + '</p>' +
+    '<p><strong>Eau :</strong> ' + escapeHtml(r.water || 'Non renseigné') + ' · <strong>Électricité :</strong> ' + escapeHtml(r.electricity || 'Non renseigné') + '</p>' +
+    '<p><strong>État :</strong> ' + escapeHtml(r.condition || 'Non renseigné') + '</p>' +
+    '<p><strong>Précisions :</strong> ' + escapeHtml(r.note || 'Aucune') + '</p>' +
+    (photos ? '<div class="admin-photo-grid">' + photos + '</div>' : ((r.photos || []).length ? '<p class="empty">Photos enregistrées, stockage actuellement indisponible.</p>' : '')) +
+    receipt + paymentForm + '</div><div class="booking-detail-edit">' + renderEditForm(r) + '</div></div>';
+}
+function renderBookings(rows) {
+  ALL_BOOKINGS = rows;
+  applyBookingFilters();
+}
+function applyBookingFilters() {
+  const query = ($('#bookingSearch')?.value || '').trim().toLocaleLowerCase('fr');
+  const status = $('#bookingStatus')?.value || 'all';
+  const filtered = ALL_BOOKINGS.filter(r => {
+    const haystack = [r.id, r.firstName, r.lastName, r.email, r.phone, r.vehicle, r.address, r.service].join(' ').toLocaleLowerCase('fr');
+    return (status === 'all' || r.status === status) && (!query || haystack.includes(query));
+  });
+  $('#bookingCount').textContent = filtered.length + ' réservation(s) affichée(s) sur ' + ALL_BOOKINGS.length;
   const box = $('#bookings');
-  if (!rs.length) {
-    box.innerHTML = '<li class="empty">Aucune réservation.</li>';
+  if (!filtered.length) {
+    box.innerHTML = '<tr><td colspan="6" class="empty">Aucune réservation ne correspond à votre recherche.</td></tr>';
     return;
   }
-
-  box.innerHTML = rs.map(r => {
-    const photos = (r.photos || []).filter(p => p && p.url).map(p =>
-      '<a href="' + escapeHtml(p.url) + '" target="_blank" rel="noopener noreferrer" title="Ouvrir la photo">' +
-      '<img src="' + escapeHtml(p.url) + '" alt="Photo du véhicule" loading="lazy" ' +
-      'style="width:94px;height:70px;object-fit:cover;border-radius:8px;border:1px solid var(--border)"></a>'
-    ).join('');
-    const canRecordPayment = r.status === 'pending';
-    const serviceOptions = ['Essentiel', 'Intégral'].map(service =>
-      '<option value="' + service + '"' + (r.service === service ? ' selected' : '') + '>' +
-      service + ' — ' + (service === 'Essentiel' ? '90' : '130') + ' €</option>'
-    ).join('');
-    const savedAddons = Array.isArray(r.paymentItems)
-      ? r.paymentItems.slice(1).map(item => item.name + ' | ' + item.amount).join('\n')
-      : '';
-    const paymentForm = canRecordPayment
-      ? '<div class="payment-config">' +
-      '<label>Formule finale<select data-field="service">' + serviceOptions + '</select></label>' +
-      '<label>Suppléments (une ligne par extra : intitulé | prix en €)' +
-      '<textarea data-field="addons" rows="3" placeholder="Poils d’animaux | 20&#10;Traitement des taches | 15">' +
-      escapeHtml(savedAddons) + '</textarea></label>' +
-      '<label>Mode de règlement<select data-field="paymentMethod"><option value="card">Carte bancaire (terminal / application)</option><option value="cash">Espèces</option></select></label>' +
-      '<small class="empty">Enregistrez uniquement après le nettoyage et après avoir réellement reçu le règlement. Le client doit avoir accepté la formule et chaque supplément.</small>' +
-      '<button class="btn btn-primary btn-small" data-action="payment" data-id="' + escapeHtml(r.id) + '">Enregistrer le paiement reçu et envoyer le reçu</button>' +
-      '<button class="btn btn-secondary btn-small" data-action="decline" data-id="' + escapeHtml(r.id) + '">Refuser la demande</button></div>'
-      : '';
-    const receiptDetails = r.status === 'confirmed'
-      ? '<div class="payment-receipt"><strong>Règlement enregistré : ' + escapeHtml(r.amount) + ' €</strong><br>Mode : ' +
-      escapeHtml(r.paymentMethod === 'card' ? 'Carte bancaire' : r.paymentMethod === 'cash' ? 'Espèces' : 'Non renseigné') +
-      (Array.isArray(r.paymentItems) && r.paymentItems.length
-        ? '<ul>' + r.paymentItems.map(item => '<li>' + escapeHtml(item.name) + ' : ' + escapeHtml(item.amount) + ' €</li>').join('') + '</ul>' : '') +
-      '</div>' : '';
-
-    return '<li class="booking-admin-item"><div><strong>' + escapeHtml(r.date) + ' · ' + escapeHtml(r.time) +
-      '</strong> <span class="status status-' + escapeHtml(r.status) + '">' + escapeHtml(labelStatus(r.status)) +
-      '</span><br>' + escapeHtml(r.firstName) + ' ' + escapeHtml(r.lastName) + ' · ' + escapeHtml(r.service) +
-      ' · ' + escapeHtml(r.vehicle) + '<br><strong>Montant enregistré : ' + escapeHtml(r.amount) + ' €</strong>' +
-      '<br><span class="empty">' + escapeHtml(r.phone) + ' · ' + escapeHtml(r.email) +
-      '<br>' + escapeHtml(r.address) + '<br>Eau : <strong>' + escapeHtml(r.water || 'Non renseigné') +
-      '</strong> · Électricité : <strong>' + escapeHtml(r.electricity || 'Non renseigné') +
-      '</strong><br>État : ' + escapeHtml(r.condition || '') + (r.note ? ' · ' + escapeHtml(r.note) : '') +
-      '</span>' + (photos ? '<div class="admin-photo-grid" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px">' + photos + '</div>' :
-        ((r.photos || []).length ? '<br><span class="photo-count">Photos enregistrées, mais leur stockage n’est pas disponible.</span>' : '')) +
-      receiptDetails + paymentForm + '</div></li>';
-  }).join('');
+  box.innerHTML = filtered.map(r =>
+    '<tr class="booking-table-row">' +
+    '<td><strong>' + escapeHtml(r.date) + '</strong><br>' + escapeHtml(r.time) + '</td>' +
+    '<td><strong>' + escapeHtml(r.firstName) + ' ' + escapeHtml(r.lastName) + '</strong><br><span class="table-subtext">' + escapeHtml(r.phone) + '</span></td>' +
+    '<td>' + escapeHtml(r.service) + '</td><td><strong>' + escapeHtml(r.amount) + ' €</strong></td>' +
+    '<td><span class="status status-' + escapeHtml(r.status) + '">' + escapeHtml(labelStatus(r.status)) + '</span></td>' +
+    '<td><div class="table-actions"><button class="btn btn-secondary btn-small" data-action="toggle-details" data-id="' + escapeHtml(r.id) + '">Détails / modifier</button>' +
+    '<button class="btn btn-danger btn-small" data-action="delete-booking" data-id="' + escapeHtml(r.id) + '">Supprimer</button></div></td></tr>' +
+    '<tr class="booking-detail-row" id="details-' + escapeHtml(r.id) + '" hidden><td colspan="6">' + renderBookingDetails(r) + '</td></tr>'
+  ).join('');
+  for (const r of filtered) {
+    const detail = $('#details-' + CSS.escape(r.id));
+    const form = detail?.querySelector('[data-edit-form]');
+    if (form) {
+      const water = form.querySelector('[data-field="water"]');
+      const electricity = form.querySelector('[data-field="electricity"]');
+      if (water) water.value = r.water || 'Non renseigné';
+      if (electricity) electricity.value = r.electricity || 'Non renseigné';
+    }
+  }
+}
+async function render() {
+  try {
+    renderBookings(await api('/api/admin/bookings'));
+  } catch (e) {
+    $('#bookings').innerHTML = '<tr><td colspan="6" class="empty">' + escapeHtml(e.message) + '</td></tr>';
+  }
+  try { renderBlocks(await api('/api/admin/blocks')); }
+  catch (e) { $('#blocks').innerHTML = '<li class="empty">' + escapeHtml(e.message) + '</li>'; }
+  await renderNotifications();
+}
+function renderBlocks(rows) {
+  const box = $('#blocks');
+  if (!Array.isArray(rows) || !rows.length) { box.innerHTML = '<li class="empty">Aucun créneau bloqué.</li>'; return; }
+  box.innerHTML = rows.map(b => '<li><span>' + escapeHtml(b.date) + ' · ' + escapeHtml(b.time) +
+    '</span><button class="danger" data-action="remove-block" data-id="' + escapeHtml(b.id) + '">Supprimer</button></li>').join('');
+}
+const emailStatusLabel = { pending: 'En attente', sending: 'En cours d’envoi', sent: 'Envoyé', failed: 'Échec' };
+async function renderNotifications() {
+  const provider = $('#emailProvider'), box = $('#emailOutbox');
+  try {
+    const data = await api('/api/admin/email-outbox');
+    provider.textContent = data.configured ? 'Fournisseur : ' + data.provider + ' · File de notifications' :
+      'Aucun fournisseur e-mail valide. Configurez Resend ou SMTP avant de recevoir des réservations.';
+    if (!data.messages.length) { box.innerHTML = '<li class="empty">Aucune notification en file.</li>'; return; }
+    box.innerHTML = data.messages.map(m => '<li class="booking-admin-item"><div><strong>' + escapeHtml(m.subject) + '</strong><br>' +
+      '<span class="empty">' + escapeHtml(m.recipient) + ' · ' + escapeHtml(emailStatusLabel[m.status] || m.status) +
+      ' · tentatives : ' + escapeHtml(m.attempts) + '</span>' +
+      (m.lastError ? '<br><span class="photo-count">' + escapeHtml(m.lastError) + '</span>' : '') +
+      (m.sentAt ? '<br><span class="empty">Envoyé le ' + escapeHtml(new Date(m.sentAt).toLocaleString('fr-FR')) + '</span>' : '') +
+      '</div><div class="admin-actions">' + (m.status === 'failed' ? '<button class="btn btn-secondary btn-small" data-action="retry-email" data-id="' + escapeHtml(m.id) + '">Réessayer</button>' : '') +
+      '</div></li>').join('');
+  } catch (e) { provider.textContent = 'Impossible de lire la file e-mail : ' + e.message; box.innerHTML = ''; }
+}
+async function sendPayment(id, button) {
+  const detail = button.closest('.booking-detail-row');
+  const service = detail?.querySelector('[data-field="service"]')?.value;
+  const addonText = detail?.querySelector('[data-field="addons"]')?.value || '';
+  const paymentMethod = detail?.querySelector('[data-field="paymentMethod"]')?.value;
+  const addons = [];
+  for (const line of addonText.split(/\r?\n/).map(value => value.trim()).filter(Boolean)) {
+    const separator = line.lastIndexOf('|');
+    if (separator < 1) return alert('Format invalide. Utilisez : intitulé | prix en euros.');
+    const name = line.slice(0, separator).trim(), amountText = line.slice(separator + 1).trim();
+    if (!name || !/^\d+$/.test(amountText)) return alert('Chaque supplément doit avoir un intitulé et un prix entier en euros.');
+    addons.push({ name, amount: Number(amountText) });
+  }
+  const methodLabel = paymentMethod === 'card' ? 'carte bancaire' : 'espèces';
+  if (!confirm('Confirmez-vous que le nettoyage est terminé, que le client a accepté la formule et les suppléments, et que le règlement par ' + methodLabel + ' a réellement été reçu ?')) return;
+  button.disabled = true;
+  try {
+    const d = await api('/api/admin/bookings/' + encodeURIComponent(id) + '/payment', {
+      method: 'POST', body: JSON.stringify({ service, addons, paymentMethod, customerAgreed: true })
+    });
+    if (d.emailSent) alert('Paiement de ' + d.totalAmount + ' € enregistré. Le reçu a été envoyé.');
+    else alert('Paiement enregistré. Vérifiez la file des notifications e-mail.');
+    await render();
+  } catch (e) { alert(e.message); button.disabled = false; }
+}
+async function saveBooking(form) {
+  const id = form.dataset.editForm;
+  const values = {};
+  form.querySelectorAll('[data-field]').forEach(input => { values[input.dataset.field] = input.value; });
+  try {
+    await api('/api/admin/bookings/' + encodeURIComponent(id), { method: 'PATCH', body: JSON.stringify(values) });
+    alert('Réservation mise à jour.');
+    await render();
+    const row = $('#details-' + CSS.escape(id));
+    if (row) row.hidden = false;
+  } catch (e) { alert(e.message); }
+}
+async function deleteBooking(id) {
+  const booking = ALL_BOOKINGS.find(item => item.id === id);
+  if (!booking) return;
+  const identity = booking.firstName + ' ' + booking.lastName + ' · ' + booking.date;
+  if (!confirm('Supprimer définitivement la réservation de ' + identity + ' ?\n\nCette action supprime la réservation et ses photos associées. Elle est irréversible.')) return;
+  try {
+    await api('/api/admin/bookings/' + encodeURIComponent(id), { method: 'DELETE' });
+    ALL_BOOKINGS = ALL_BOOKINGS.filter(item => item.id !== id);
+    applyBookingFilters();
+    alert('Réservation supprimée.');
+  } catch (e) { alert(e.message); }
 }
 $('#bookings').addEventListener('click', async event => {
   const button = event.target.closest('button[data-action]');
   if (!button) return;
-  const id = button.dataset.id;
-  if (button.dataset.action === 'payment') await sendPayment(id, button);
-  if (button.dataset.action === 'decline') await decline(id);
-});
-
-function labelStatus(s) {
-  return { pending: 'Réservation reçue', confirmed: 'Payé', declined: 'Refusé' }[s] || s;
-}
-
-async function render() {
-  try {
-    const data = await api('/api/admin/bookings');
-    renderBookings(data);
-  } catch (e) {
-    $('#bookings').innerHTML = `<li class="empty">${escapeHtml(e.message)}</li>`;
+  const { action, id } = button.dataset;
+  if (action === 'toggle-details') {
+    const row = $('#details-' + CSS.escape(id));
+    row.hidden = !row.hidden;
+    button.textContent = row.hidden ? 'Détails / modifier' : 'Masquer les détails';
   }
-
-  try {
-    renderBlocks(await api('/api/admin/blocks'));
-  } catch (e) {
-    $('#blocks').innerHTML = `<li class="empty">${escapeHtml(e.message)}</li>`;
+  if (action === 'delete-booking') await deleteBooking(id);
+  if (action === 'payment') await sendPayment(id, button);
+  if (action === 'decline') {
+    if (!confirm('Refuser cette demande ?')) return;
+    try { await api('/api/admin/bookings/' + encodeURIComponent(id) + '/decline', { method: 'POST' }); await render(); }
+    catch (e) { alert(e.message); }
   }
-
-  await renderNotifications();
-}
-
-function renderBlocks(rows) {
-  const box = $('#blocks');
-  if (!Array.isArray(rows) || !rows.length) {
-    box.innerHTML = '<li class="empty">Aucun créneau bloqué.</li>';
-    return;
+  if (action === 'cancel-edit') {
+    const row = button.closest('.booking-detail-row');
+    const form = row?.querySelector('[data-edit-form]');
+    if (form) form.reset();
   }
-  box.innerHTML = rows.map(b =>
-    '<li><span>' + escapeHtml(b.date) + ' · ' + escapeHtml(b.time) +
-    '</span><button class="danger" data-action="remove-block" data-id="' + escapeHtml(b.id) +
-    '">Supprimer</button></li>'
-  ).join('');
-}
-
-const emailStatusLabel = {
-  pending: 'En attente', sending: 'En cours d’envoi', sent: 'Envoyé', failed: 'Échec'
-};
-async function renderNotifications() {
-  const provider = $('#emailProvider');
-  const box = $('#emailOutbox');
-  if (!provider || !box) return;
-  try {
-    const data = await api('/api/admin/email-outbox');
-    provider.textContent = data.configured
-      ? 'Fournisseur : ' + data.provider + ' · File de notifications'
-      : 'Aucun fournisseur e-mail valide. Configurez Resend (recommandé) ou SMTP avant de recevoir des réservations.';
-    if (!data.messages.length) {
-      box.innerHTML = '<li class="empty">Aucune notification en file.</li>';
-      return;
-    }
-    box.innerHTML = data.messages.map(m =>
-      '<li class="booking-admin-item"><div><strong>' + escapeHtml(m.subject) + '</strong><br>' +
-      '<span class="empty">' + escapeHtml(m.recipient) + ' · ' +
-      escapeHtml(emailStatusLabel[m.status] || m.status) + ' · tentatives : ' +
-      escapeHtml(m.attempts) + '</span>' +
-      (m.lastError ? '<br><span class="photo-count">' + escapeHtml(m.lastError) + '</span>' : '') +
-      (m.sentAt ? '<br><span class="empty">Envoyé le ' + escapeHtml(new Date(m.sentAt).toLocaleString('fr-FR')) + '</span>' : '') +
-      '</div><div class="admin-actions">' +
-      (m.status === 'failed'
-        ? '<button class="btn btn-secondary btn-small" data-action="retry-email" data-id="' + escapeHtml(m.id) + '">Réessayer</button>'
-        : '') +
-      '</div></li>'
-    ).join('');
-  } catch (e) {
-    provider.textContent = 'Impossible de lire la file e-mail : ' + e.message;
-    box.innerHTML = '';
+  if (action === 'remove-block') {
+    try { await api('/api/admin/blocks/' + encodeURIComponent(id), { method: 'DELETE' }); await renderBlocks(await api('/api/admin/blocks')); }
+    catch (e) { alert(e.message); }
   }
-}
-
-$('#emailOutbox').addEventListener('click', async event => {
-  const button = event.target.closest('button[data-action="retry-email"]');
-  if (!button) return;
-  button.disabled = true;
-  try {
-    await api('/api/admin/email-outbox/' + encodeURIComponent(button.dataset.id) + '/retry', { method: 'POST' });
-    await renderNotifications();
-  } catch (e) {
-    alert(e.message);
-    button.disabled = false;
+  if (action === 'retry-email') {
+    button.disabled = true;
+    try { await api('/api/admin/email-outbox/' + encodeURIComponent(id) + '/retry', { method: 'POST' }); await renderNotifications(); }
+    catch (e) { alert(e.message); button.disabled = false; }
   }
 });
-
+$('#bookings').addEventListener('submit', event => {
+  const form = event.target.closest('[data-edit-form]');
+  if (!form) return;
+  event.preventDefault();
+  saveBooking(form);
+});
 $('#blocks').addEventListener('click', async event => {
   const button = event.target.closest('button[data-action="remove-block"]');
   if (!button) return;
-  await removeBlock(button.dataset.id);
+  try { await api('/api/admin/blocks/' + encodeURIComponent(button.dataset.id), { method: 'DELETE' }); await renderBlocks(await api('/api/admin/blocks')); }
+  catch (e) { alert(e.message); }
 });
-
-async function sendPayment(id, button) {
-  const card = button.closest('.booking-admin-item');
-  const service = card?.querySelector('[data-field="service"]')?.value;
-  const addonText = card?.querySelector('[data-field="addons"]')?.value || '';
-  const paymentMethod = card?.querySelector('[data-field="paymentMethod"]')?.value;
-  const addons = [];
-  for (const line of addonText.split(/\r?\n/).map(value => value.trim()).filter(Boolean)) {
-    const separator = line.lastIndexOf('|');
-    if (separator < 1) return alert('Format de supplément invalide. Utilisez une ligne par extra : intitulé | prix en euros.');
-    const name = line.slice(0, separator).trim();
-    const amountText = line.slice(separator + 1).trim();
-    if (!name || !/^\d+$/.test(amountText)) return alert('Chaque supplément doit avoir un intitulé et un prix entier en euros. Exemple : Poils d’animaux | 20');
-    addons.push({ name, amount: Number(amountText) });
-  }
-  const methodLabel = paymentMethod === 'card' ? 'carte bancaire' : 'espèces';
-  if (!confirm('Confirmez-vous que le nettoyage est terminé, que le client a accepté la formule et tous les suppléments, et que le règlement par ' + methodLabel + ' a réellement été reçu ? Cette action marque la réservation comme payée et envoie un reçu par e-mail.')) return;
-  button.disabled = true;
-  try {
-    const d = await api(`/api/admin/bookings/${id}/payment`, {
-      method: 'POST',
-      body: JSON.stringify({ service, addons, paymentMethod, customerAgreed: true })
-    });
-    if (d.emailSent) alert('Paiement de ' + d.totalAmount + ' € enregistré. Le reçu a été envoyé au client.');
-    else if (d.emailStatus === 'failed') alert('Paiement de ' + d.totalAmount + ' € enregistré, mais le reçu n’a pas été envoyé. Consultez « Notifications e-mail » et réessayez.');
-    else alert('Paiement de ' + d.totalAmount + ' € enregistré. L’envoi du reçu est en cours ; vérifiez « Notifications e-mail ».');
-    render();
-  } catch (e) { alert(e.message); button.disabled = false; }
-}
-async function decline(id) {
-  if (!confirm('Refuser cette demande ?'))
-    return;
-  try {
-    await api(`/api/admin/bookings/${id}/decline`, { method: 'POST' });
-    render();
-  } catch (e) {
-    alert(e.message);
-  }
-}
-async function removeBlock(id) {
-  try {
-    await api('/api/admin/blocks/' + encodeURIComponent(id), { method: 'DELETE' });
-    renderBlocks(await api('/api/admin/blocks'));
-  } catch (e) {
-    alert(e.message);
-  }
-}
-
 $('#blockDate').min = new Date().toISOString().slice(0, 10);
 $('#blockBtn').onclick = async () => {
   const date = $('#blockDate').value, time = $('#blockTime').value;
-  if (!date)
-    return alert('Choisissez une date.');
-  try {
-    await api('/api/admin/blocks', { method: 'POST', body: JSON.stringify({ date, time }) });
-    renderBlocks(await api('/api/admin/blocks'));
-  } catch (e) {
-    alert(e.message);
-  }
+  if (!date) return alert('Choisissez une date.');
+  try { await api('/api/admin/blocks', { method: 'POST', body: JSON.stringify({ date, time }) }); await renderBlocks(await api('/api/admin/blocks')); }
+  catch (e) { alert(e.message); }
 };
 $('#clearBtn').onclick = () => render();
 $('#refreshEmails').onclick = () => renderNotifications();
+$('#bookingSearch').addEventListener('input', applyBookingFilters);
+$('#bookingStatus').addEventListener('change', applyBookingFilters);
 if (!ADMIN_KEY) {
   ADMIN_KEY = prompt('Clé administrateur (ADMIN_KEY) :') || '';
-
-  if (ADMIN_KEY)
-    localStorage.setItem('epure_admin_key', ADMIN_KEY);
-
+  if (ADMIN_KEY) localStorage.setItem('epure_admin_key', ADMIN_KEY);
 }
 render();
