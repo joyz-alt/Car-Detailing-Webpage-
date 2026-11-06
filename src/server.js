@@ -683,12 +683,24 @@ app.post('/api/bookings', bookingRateLimit, (req, res, next) => {
 }));
 
 app.get('/api/admin/email-outbox', adminGuard, asyncHandler(async (req, res) => {
-  const result = await pool.query(
-    'SELECT id, booking_id AS "bookingId", recipient, subject, status, attempts, next_attempt_at AS "nextAttemptAt", ' +
-    'last_error AS "lastError", created_at AS "createdAt", sent_at AS "sentAt" ' +
-    'FROM email_outbox ORDER BY created_at DESC LIMIT 30'
-  );
-  res.json({ configured: emailSetupReady(), provider: getEmailProvider() || 'none', messages: result.rows });
+  const [counts, messages] = await Promise.all([
+    pool.query(
+      "SELECT COUNT(*) FILTER (WHERE status = 'sent')::int AS sent, " +
+      "COUNT(*) FILTER (WHERE status = 'pending')::int AS pending, " +
+      "COUNT(*) FILTER (WHERE status = 'sending')::int AS sending, " +
+      "COUNT(*) FILTER (WHERE status = 'failed')::int AS failed FROM email_outbox"
+    ),
+    pool.query(
+      'SELECT id, booking_id AS "bookingId", recipient, subject, status, attempts, next_attempt_at AS "nextAttemptAt", ' +
+      'last_error AS "lastError", created_at AS "createdAt" ' +
+      "FROM email_outbox WHERE status IN ('pending', 'sending', 'failed') " +
+      "ORDER BY CASE status WHEN 'failed' THEN 0 WHEN 'sending' THEN 1 ELSE 2 END, created_at DESC LIMIT 50"
+    )
+  ]);
+  res.json({
+    configured: emailSetupReady(), provider: getEmailProvider() || 'none',
+    counts: counts.rows[0], messages: messages.rows
+  });
 }));
 
 app.post('/api/admin/email-outbox/:id/retry', adminGuard, asyncHandler(async (req, res) => {
