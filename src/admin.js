@@ -65,11 +65,24 @@ function labelStatus(s) {
 }
 function initAdminDatePickers(root = document) {
   if (!window.flatpickr) return;
+  const isMobile = window.matchMedia('(max-width: 760px)').matches;
   root.querySelectorAll('input[type="date"]:not([data-picker-ready])').forEach(input => {
     input.dataset.pickerReady = 'true';
-    flatpickr(input, { locale: 'fr', dateFormat: 'Y-m-d', altInput: true, altFormat: 'j F Y',
+    flatpickr(input, {
+      locale: 'fr',
+      dateFormat: 'Y-m-d',
+      altInput: true,
+      altFormat: 'j F Y',
       minDate: (input.id === 'manualDate' || input.id === 'blockDate') ? 'today' : null,
-      disableMobile: true, allowInput: true, monthSelectorType: 'static' });
+      disableMobile: true,
+      allowInput: true,
+      monthSelectorType: isMobile ? 'dropdown' : 'static',
+      showMonths: 1,
+      position: 'auto',
+      onOpen: (selectedDates, dateStr, instance) => {
+        instance.calendarContainer.classList.toggle('admin-mobile-datepicker', window.matchMedia('(max-width: 760px)').matches);
+      }
+    });
   });
 }
 function formatBookingDate(value) {
