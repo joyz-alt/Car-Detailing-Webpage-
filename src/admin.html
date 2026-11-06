@@ -20,19 +20,23 @@
     <p class="admin-intro">Gérez vos demandes, corrigez les informations d’une réservation et enregistrez les paiements après la prestation. Les clients ne paient pas en ligne.</p>
     <div class="admin-toolbar"><button class="btn btn-primary" id="openManualBooking" type="button">＋ Ajouter une prestation</button></div>
     <div class="admin-grid">
-      <section class="admin-card">
-        <h3>Bloquer un créneau</h3>
-        <p class="empty">Pour les cours, congés, indisponibilités ou rendez-vous personnels.</p>
-        <label>Date<input type="date" id="blockDate"></label>
-        <label>Heure<select id="blockTime">
-          <option>09:00</option><option>10:30</option><option>12:00</option><option>13:00</option>
-          <option>14:00</option><option>14:30</option><option>15:30</option><option>17:00</option>
-        </select></label>
-        <button class="btn btn-primary" id="blockBtn">Bloquer ce créneau</button>
+      <section class="admin-card admin-calendar-card">
+        <div class="admin-section-heading"><div><div class="section-label">VUE D’ENSEMBLE</div><h3>Calendrier</h3><p class="empty">Prestations et indisponibilités en un coup d’œil.</p></div>
+          <div class="calendar-navigation"><button class="btn btn-secondary btn-small" id="calendarPrev" aria-label="Mois précédent">←</button><button class="btn btn-secondary btn-small" id="calendarToday">Aujourd’hui</button><button class="btn btn-secondary btn-small" id="calendarNext" aria-label="Mois suivant">→</button></div>
+        </div>
+        <div class="calendar-month-title" id="calendarMonthTitle"></div><div class="admin-calendar" id="adminCalendar"></div>
+        <div class="calendar-legend"><span><i class="calendar-dot dot-booking"></i>Prestation payée</span><span><i class="calendar-dot dot-pending"></i>En attente</span><span><i class="calendar-dot dot-block"></i>Indisponibilité</span></div>
       </section>
-      <section class="admin-card">
-        <h3>Créneaux bloqués</h3>
-        <ul class="admin-list" id="blocks"></ul>
+      <section class="admin-card admin-block-card">
+        <h3>Bloquer une période</h3><p class="empty">Choisissez librement les heures de début et de fin. Les prestations qui chevauchent cette période seront empêchées.</p>
+        <div class="block-form-grid">
+          <label>Date<input type="date" id="blockDate"></label>
+          <label>Motif (facultatif)<input type="text" id="blockLabel" maxlength="80" placeholder="Cours, rendez-vous, vie privée…"></label>
+          <label>De<input type="time" id="blockTime" step="900" value="09:00"></label>
+          <label>À<input type="time" id="blockEndTime" step="900" value="12:00"></label>
+        </div>
+        <button class="btn btn-primary" id="blockBtn">＋ Bloquer cette période</button>
+        <div class="calendar-blocks-heading"><h4>Périodes bloquées</h4><span class="empty" id="blockCount"></span></div><ul class="admin-list" id="blocks"></ul>
       </section>
       <section class="admin-card admin-bookings-card">
         <div class="admin-section-heading">

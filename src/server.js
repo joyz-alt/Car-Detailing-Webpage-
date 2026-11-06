@@ -285,6 +285,11 @@ async function processEmailQueue() {
 }
 
 async function ensureEmailOutboxSchema() {
+  await pool.query('ALTER TABLE booking_blocks ADD COLUMN IF NOT EXISTS block_end_time TIME');
+  await pool.query("ALTER TABLE booking_blocks ADD COLUMN IF NOT EXISTS block_label TEXT NOT NULL DEFAULT 'Indisponibilité'");
+  await pool.query("UPDATE booking_blocks SET block_end_time = block_time + interval '1 hour' WHERE block_end_time IS NULL");
+  await pool.query('ALTER TABLE booking_blocks DROP CONSTRAINT IF EXISTS booking_blocks_block_date_block_time_key');
+  await pool.query('CREATE UNIQUE INDEX IF NOT EXISTS booking_blocks_unique_period_idx ON booking_blocks (block_date, block_time, block_end_time)');
   // Keep legacy booking labels readable while allowing the two current packages.
   await pool.query('ALTER TABLE bookings DROP CONSTRAINT IF EXISTS bookings_service_check');
   await pool.query("ALTER TABLE bookings ADD CONSTRAINT bookings_service_check CHECK (service IN ('Essentiel', 'Intégral', 'Entretien', 'Nettoyage complet', 'Rénovation intérieure', 'Essentielle', 'Premium'))");
@@ -417,7 +422,7 @@ async function isSlotAvailable(client, date, time, service) {
   const blocked = await client.query(
     'SELECT 1 FROM booking_blocks WHERE block_date = $1 ' +
     'AND block_time < ($2::time + ($3 * interval \'1 minute\')) ' +
-    'AND block_time + interval \'1 hour\' > $2::time LIMIT 1',
+    'AND COALESCE(block_end_time, block_time + interval \'1 hour\') > $2::time LIMIT 1',
     [date, time, duration]
   );
   return blocked.rowCount === 0;
@@ -502,7 +507,7 @@ app.get('/api/next-availability', availabilityRateLimit, asyncHandler(async (req
       [weekStart, queryEnd, ACTIVE_STATUSES]
     );
     const blocks = await client.query(
-      'SELECT block_date::text AS date, to_char(block_time, \'HH24:MI\') AS time FROM booking_blocks ' +
+      'SELECT block_date::text AS date, to_char(block_time, \'HH24:MI\') AS time, to_char(COALESCE(block_end_time, block_time + interval \'1 hour\'), \'HH24:MI\') AS end_time FROM booking_blocks ' +
       'WHERE block_date >= $1 AND block_date <= $2',
       [weekStart, queryEnd]
     );
@@ -518,7 +523,7 @@ app.get('/api/next-availability', availabilityRateLimit, asyncHandler(async (req
     for (const block of blocks.rows) {
       if (!byDate.has(block.date)) byDate.set(block.date, { bookings: [], blocks: [] });
       const start = slotMinutes(block.time);
-      byDate.get(block.date).blocks.push({ start, end: start + 60 });
+      byDate.get(block.date).blocks.push({ start, end: slotMinutes(block.end_time) });
     }
 
     const duration = SERVICES[service].durationMinutes + BUFFER_MINUTES;
@@ -771,16 +776,22 @@ app.get('/api/admin/bookings', adminGuard, asyncHandler(async (req, res) => {
   res.json(await Promise.all(result.rows.map(async b => ({ ...b, photos: await photoList(b.id) }))));
 }));
 app.get('/api/admin/blocks', adminGuard, asyncHandler(async (req, res) => {
-  const r = await pool.query('SELECT id, block_date::text AS date, to_char(block_time, \'HH24:MI\') AS time FROM booking_blocks ORDER BY block_date, block_time');
+  const r = await pool.query(
+    "SELECT id, block_date::text AS date, to_char(block_time, 'HH24:MI') AS time, " +
+    "to_char(COALESCE(block_end_time, block_time + interval '1 hour'), 'HH24:MI') AS end_time, block_label AS label " +
+    "FROM booking_blocks ORDER BY block_date, block_time"
+  );
   res.json(r.rows);
 }));
 app.post('/api/admin/blocks', adminGuard, asyncHandler(async (req, res) => {
   const date = text(req.body && req.body.date, 10), time = text(req.body && req.body.time, 5);
-  if (!isValidDate(date) || date < parisToday() || !SLOTS.includes(time)) return res.status(400).json({ error: 'Date ou heure invalide.' });
-  await pool.query(
-    'INSERT INTO booking_blocks (id, block_date, block_time) VALUES ($1,$2,$3) ON CONFLICT (block_date, block_time) DO NOTHING',
-    [makeId('B'), date, time]
-  );
+  const endTime = text(req.body && req.body.endTime, 5), label = text(req.body && req.body.label, 80) || 'Indisponibilité';
+  const validClock = value => /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
+  if (!isValidDate(date) || date < parisToday() || !validClock(time) || !validClock(endTime) || slotMinutes(endTime) <= slotMinutes(time)) {
+    return res.status(400).json({ error: 'Choisissez une date et une plage horaire valide. La fin doit être après le début.' });
+  }
+  await pool.query('INSERT INTO booking_blocks (id, block_date, block_time, block_end_time, block_label) VALUES ($1,$2,$3,$4,$5)',
+    [makeId('B'), date, time, endTime, label]);
   res.json({ ok: true });
 }));
 app.delete('/api/admin/blocks/:id', adminGuard, asyncHandler(async (req, res) => {
@@ -815,7 +826,7 @@ app.post('/api/admin/bookings', adminGuard, asyncHandler(async (req, res) => {
       'AND booking_time + (duration_minutes + ' + BUFFER_MINUTES + ') * interval \'1 minute\' > $3::time LIMIT 1',
       [date, ACTIVE_STATUSES, time, duration]);
     const blocked = await client.query(
-      'SELECT 1 FROM booking_blocks WHERE block_date = $1 AND block_time < ($2::time + ($3 * interval \'1 minute\')) AND block_time + interval \'1 hour\' > $2::time LIMIT 1',
+      'SELECT 1 FROM booking_blocks WHERE block_date = $1 AND block_time < ($2::time + ($3 * interval \'1 minute\')) AND COALESCE(block_end_time, block_time + interval \'1 hour\') > $2::time LIMIT 1',
       [date, time, duration]);
     if (overlap.rowCount || blocked.rowCount) { await client.query('ROLLBACK'); return res.status(409).json({ error: 'Ce créneau chevauche une autre réservation ou un créneau bloqué.' }); }
     await client.query(
@@ -896,7 +907,7 @@ app.patch('/api/admin/bookings/:id', adminGuard, asyncHandler(async (req, res) =
     const blocked = await client.query(
       'SELECT 1 FROM booking_blocks WHERE block_date = $1 ' +
       'AND block_time < ($2::time + ($3 * interval \'1 minute\')) ' +
-      'AND block_time + interval \'1 hour\' > $2::time LIMIT 1',
+      'AND COALESCE(block_end_time, block_time + interval \'1 hour\') > $2::time LIMIT 1',
       [date, time, duration]
     );
     if (overlap.rowCount || blocked.rowCount) {
@@ -1030,7 +1041,7 @@ app.post('/api/admin/bookings/:id/payment', adminGuard, asyncHandler(async (req,
       const blocked = await client.query(
         'SELECT 1 FROM booking_blocks WHERE block_date = $1 ' +
         'AND block_time < ($2::time + ($3 * interval \'1 minute\')) ' +
-        'AND block_time + interval \'1 hour\' > $2::time LIMIT 1',
+        'AND COALESCE(block_end_time, block_time + interval \'1 hour\') > $2::time LIMIT 1',
         [booking.date, booking.time, packageDetails.durationMinutes + BUFFER_MINUTES]
       );
       if (overlap.rowCount || blocked.rowCount) {
