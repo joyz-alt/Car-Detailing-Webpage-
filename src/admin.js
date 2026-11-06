@@ -1,6 +1,8 @@
 const $ = s => document.querySelector(s);
 let ADMIN_KEY = localStorage.getItem('epure_admin_key') || '';
 let ALL_BOOKINGS = [];
+let ALL_BLOCKS = [];
+let CALENDAR_MONTH = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 let CURRENT_PAGE = 1;
 const PAGE_SIZE = 25;
 const SERVICE_PRICES = { Essentielle: 79, Premium: 129 };
@@ -123,6 +125,7 @@ function renderBookingDetails(r) {
 function renderBookings(rows) {
   ALL_BOOKINGS = rows;
   applyBookingFilters();
+  renderCalendar();
 }
 function applyBookingFilters() {
   const query = ($('#bookingSearch')?.value || '').trim().toLocaleLowerCase('fr');
@@ -171,16 +174,47 @@ async function render() {
   } catch (e) {
     $('#bookings').innerHTML = '<tr><td colspan="6" class="empty">' + escapeHtml(e.message) + '</td></tr>';
   }
-  try { renderBlocks(await api('/api/admin/blocks')); }
+  try { ALL_BLOCKS = await api('/api/admin/blocks'); renderBlocks(ALL_BLOCKS); renderCalendar(); }
   catch (e) { $('#blocks').innerHTML = '<li class="empty">' + escapeHtml(e.message) + '</li>'; }
   await renderNotifications();
 }
 function renderBlocks(rows) {
   const box = $('#blocks');
-  if (!Array.isArray(rows) || !rows.length) { box.innerHTML = '<li class="empty">Aucun créneau bloqué.</li>'; return; }
-  box.innerHTML = rows.map(b => '<li><span>' + escapeHtml(b.date) + ' · ' + escapeHtml(b.time) +
+  $('#blockCount').textContent = rows.length ? rows.length + ' période(s)' : 'Aucune période';
+  if (!Array.isArray(rows) || !rows.length) { box.innerHTML = '<li class="empty">Aucune période bloquée.</li>'; return; }
+  box.innerHTML = rows.map(b => '<li><span><strong>' + escapeHtml(formatBookingDate(b.date)) + '</strong><br>' +
+    escapeHtml(b.time) + ' → ' + escapeHtml(b.end_time) + ' · ' + escapeHtml(b.label || 'Indisponibilité') +
     '</span><button class="danger" data-action="remove-block" data-id="' + escapeHtml(b.id) + '">Supprimer</button></li>').join('');
 }
+function calendarDateKey(date) {
+  return date.getFullYear() + '-' + String(date.getMonth()+1).padStart(2,'0') + '-' + String(date.getDate()).padStart(2,'0');
+}
+function renderCalendar() {
+  const host = $('#adminCalendar'); if (!host) return;
+  const year = CALENDAR_MONTH.getFullYear(), month = CALENDAR_MONTH.getMonth();
+  $('#calendarMonthTitle').textContent = CALENDAR_MONTH.toLocaleDateString('fr-FR',{month:'long',year:'numeric'});
+  const first = new Date(year,month,1), offset = (first.getDay()+6)%7;
+  const start = new Date(year,month,1-offset), today = calendarDateKey(new Date());
+  const cells = ['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'].map(day => '<div class="calendar-weekday">'+day+'</div>');
+  for(let index=0;index<42;index++){
+    const date = new Date(start.getFullYear(),start.getMonth(),start.getDate()+index), key=calendarDateKey(date);
+    const bookings = ALL_BOOKINGS.filter(x=>x.date===key && x.status!=='declined');
+    const blocks = ALL_BLOCKS.filter(x=>x.date===key);
+    const events = bookings.map(x=>'<span class="calendar-event '+(x.status==='pending'?'is-pending':'is-booking')+'">'+escapeHtml(x.time)+' · '+escapeHtml(x.firstName||'Prestation')+'</span>');
+    blocks.forEach(x=>events.push('<span class="calendar-event is-block">'+escapeHtml(x.time)+'–'+escapeHtml(x.end_time)+' · '+escapeHtml(x.label||'Indisponible')+'</span>'));
+    const more = events.length>3?'<span class="calendar-more">+'+(events.length-3)+' autre(s)</span>':'';
+    cells.push('<button type="button" class="calendar-day '+(date.getMonth()!==month?'is-outside ':'')+(key===today?'is-today':'')+'" data-calendar-date="'+key+'" aria-label="'+key+', '+events.length+' événement(s)"><span class="calendar-day-number">'+date.getDate()+'</span><span class="calendar-events">'+events.slice(0,3).join('')+more+'</span></button>');
+  }
+  host.innerHTML=cells.join('');
+}
+$('#calendarPrev').addEventListener('click',()=>{CALENDAR_MONTH=new Date(CALENDAR_MONTH.getFullYear(),CALENDAR_MONTH.getMonth()-1,1);renderCalendar();});
+$('#calendarNext').addEventListener('click',()=>{CALENDAR_MONTH=new Date(CALENDAR_MONTH.getFullYear(),CALENDAR_MONTH.getMonth()+1,1);renderCalendar();});
+$('#calendarToday').addEventListener('click',()=>{CALENDAR_MONTH=new Date(new Date().getFullYear(),new Date().getMonth(),1);renderCalendar();});
+$('#adminCalendar').addEventListener('click',event=>{
+  const day=event.target.closest('[data-calendar-date]');if(!day)return;
+  $('#blockDate').value=day.dataset.calendarDate;$('#blockDate').focus();
+  showToast('Date sélectionnée : '+formatBookingDate(day.dataset.calendarDate)+'.');
+});
 const emailStatusLabel = { pending: 'En attente', sending: 'En cours d’envoi', sent: 'Envoyé', failed: 'Échec' };
 async function renderNotifications() {
   const provider = $('#emailProvider'), box = $('#emailOutbox');
@@ -277,7 +311,7 @@ $('#bookings').addEventListener('click', async event => {
     if (form) form.reset();
   }
   if (action === 'remove-block') {
-    try { await api('/api/admin/blocks/' + encodeURIComponent(id), { method: 'DELETE' }); await renderBlocks(await api('/api/admin/blocks')); }
+    try { await api('/api/admin/blocks/' + encodeURIComponent(id), { method: 'DELETE' }); ALL_BLOCKS = await api('/api/admin/blocks'); renderBlocks(ALL_BLOCKS); renderCalendar(); }
     catch (e) { showToast(e.message, 'error'); }
   }
   if (action === 'retry-email') {
@@ -345,10 +379,15 @@ $('#manualBookingForm').addEventListener('submit', async event => {
 
 $('#blockDate').min = new Date().toISOString().slice(0, 10);
 $('#blockBtn').onclick = async () => {
-  const date = $('#blockDate').value, time = $('#blockTime').value;
-  if (!date) return showToast('Choisissez une date.', 'error');
-  try { await api('/api/admin/blocks', { method: 'POST', body: JSON.stringify({ date, time }) }); await renderBlocks(await api('/api/admin/blocks')); }
-  catch (e) { showToast(e.message, 'error'); }
+  const date=$('#blockDate').value,time=$('#blockTime').value,endTime=$('#blockEndTime').value,label=$('#blockLabel').value.trim(),button=$('#blockBtn');
+  if(!date)return showToast('Choisissez une date.','error');
+  if(!time||!endTime||endTime<=time)return showToast('L’heure de fin doit être après l’heure de début.','error');
+  button.disabled=true;
+  try{
+    await api('/api/admin/blocks',{method:'POST',body:JSON.stringify({date,time,endTime,label})});
+    ALL_BLOCKS=await api('/api/admin/blocks');renderBlocks(ALL_BLOCKS);renderCalendar();$('#blockLabel').value='';
+    showToast('Période bloquée : '+time+' → '+endTime+'.');
+  }catch(e){showToast(e.message,'error');}finally{button.disabled=false;}
 };
 $('#clearBtn').onclick = () => render();
 $('#refreshEmails').onclick = () => renderNotifications();
