@@ -207,6 +207,26 @@ test('admin endpoints reject unauthenticated requests and show saved booking/out
   assert.equal(outbox.messages.length, 2);
 });
 
+
+test('admin can edit a booking while preserving payment state and rejects unauthenticated edits', async () => {
+  const endpoint = baseUrl + '/api/admin/bookings/' + encodeURIComponent(firstBookingId);
+  const denied = await fetch(endpoint, { method: 'PATCH', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ firstName: 'Changed' }) });
+  assert.equal(denied.status, 401);
+  const response = await fetch(endpoint, {
+    method: 'PATCH',
+    headers: { 'x-admin-key': adminKey, 'content-type': 'application/json' },
+    body: JSON.stringify({ firstName: 'Client corrigé', phone: '+33611111111', note: 'Informations corrigées' })
+  });
+  assert.equal(response.status, 200, await response.text());
+  const stored = await pool.query('SELECT first_name, phone, note, status FROM bookings WHERE id = $1', [firstBookingId]);
+  assert.equal(stored.rows[0].first_name, 'Client corrigé');
+  assert.equal(stored.rows[0].phone, '+33611111111');
+  assert.equal(stored.rows[0].note, 'Informations corrigées');
+  assert.equal(stored.rows[0].status, 'pending');
+});
+
+
 test('manual payment requires customer agreement and records itemized receipt details', async () => {
   const endpoint = baseUrl + '/api/admin/bookings/' + encodeURIComponent(firstBookingId) + '/payment';
   const headers = { 'x-admin-key': adminKey, 'content-type': 'application/json' };
@@ -236,4 +256,17 @@ test('manual payment requires customer agreement and records itemized receipt de
   assert.match(receipt.rows[0].subject, /reçu/i);
   assert.match(receipt.rows[0].html_body, /Poils d’animaux/);
   assert.match(receipt.rows[0].html_body, /114 €/);
+});
+
+test('admin can permanently delete a booking and unauthenticated deletion is rejected', async () => {
+  const endpoint = baseUrl + '/api/admin/bookings/' + encodeURIComponent(firstBookingId);
+  const denied = await fetch(endpoint, { method: 'DELETE' });
+  assert.equal(denied.status, 401);
+  const response = await fetch(endpoint, { method: 'DELETE', headers: { 'x-admin-key': adminKey } });
+  assert.equal(response.status, 200, await response.text());
+  assert.deepEqual(await response.json(), { ok: true, deleted: true });
+  const stored = await pool.query('SELECT id FROM bookings WHERE id = $1', [firstBookingId]);
+  assert.equal(stored.rowCount, 0);
+  const outbox = await pool.query('SELECT booking_id FROM email_outbox WHERE dedupe_key LIKE $1', ['booking:' + firstBookingId + ':%']);
+  assert.ok(outbox.rows.every(row => row.booking_id === null));
 });
