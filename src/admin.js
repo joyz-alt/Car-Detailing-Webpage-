@@ -38,7 +38,7 @@ $('#adminDialogForm').addEventListener('submit', event => {
 });
 $('#adminDialogCancel').addEventListener('click', () => closeDialog(false));
 $('#adminDialog').addEventListener('click', event => { if (event.target === $('#adminDialog')) closeDialog(false); });
-document.addEventListener('keydown', event => { if (event.key === 'Escape' && !$('#adminDialog').hidden) closeDialog(false); else if (event.key === 'Escape' && manualModal && !manualModal.hidden) closeManualBooking(); });
+document.addEventListener('keydown', event => { if (event.key !== 'Escape') return; if (!$('#adminDialog').hidden) closeDialog(false); else if (blockModal && !blockModal.hidden) closeBlockPeriod(); else if (manualModal && !manualModal.hidden) closeManualBooking(); });
 
 function headers(json = false) {
   const h = {};
@@ -62,6 +62,15 @@ function escapeHtml(value) {
 }
 function labelStatus(s) {
   return { pending: 'En attente', confirmed: 'Payé', declined: 'Refusé' }[s] || s;
+}
+function initAdminDatePickers(root = document) {
+  if (!window.flatpickr) return;
+  root.querySelectorAll('input[type="date"]:not([data-picker-ready])').forEach(input => {
+    input.dataset.pickerReady = 'true';
+    flatpickr(input, { locale: 'fr', dateFormat: 'Y-m-d', altInput: true, altFormat: 'j F Y',
+      minDate: (input.id === 'manualDate' || input.id === 'blockDate') ? 'today' : null,
+      disableMobile: true, allowInput: true, monthSelectorType: 'static' });
+  });
 }
 function formatBookingDate(value) {
   const date = new Date(value + 'T12:00:00');
@@ -167,6 +176,7 @@ function applyBookingFilters() {
       if (electricity) electricity.value = r.electricity || 'Non renseigné';
     }
   }
+  initAdminDatePickers(box);
 }
 async function render() {
   try {
@@ -346,6 +356,12 @@ $('#blocks').addEventListener('click', async event => {
 });
 
 $('#manualDate').min = new Date().toISOString().slice(0, 10);
+const blockModal = $('#blockPeriodModal');
+function openBlockPeriod() { blockModal.hidden = false; document.body.classList.add('dialog-open'); $('#blockDate').focus(); }
+function closeBlockPeriod() { blockModal.hidden = true; document.body.classList.remove('dialog-open'); }
+$('#openBlockPeriod').addEventListener('click', openBlockPeriod);
+$('#closeBlockPeriod').addEventListener('click', closeBlockPeriod);
+blockModal.addEventListener('click', event => { if (event.target === blockModal) closeBlockPeriod(); });
 const manualModal = $('#manualBookingModal');
 function openManualBooking() { manualModal.hidden = false; document.body.classList.add('dialog-open'); $('#manualService').focus(); }
 function closeManualBooking() { manualModal.hidden = true; document.body.classList.remove('dialog-open'); }
@@ -378,6 +394,7 @@ $('#manualBookingForm').addEventListener('submit', async event => {
 });
 
 $('#blockDate').min = new Date().toISOString().slice(0, 10);
+initAdminDatePickers();
 $('#blockBtn').onclick = async () => {
   const date=$('#blockDate').value,time=$('#blockTime').value,endTime=$('#blockEndTime').value,label=$('#blockLabel').value.trim(),button=$('#blockBtn');
   if(!date)return showToast('Choisissez une date.','error');
@@ -386,7 +403,7 @@ $('#blockBtn').onclick = async () => {
   try{
     await api('/api/admin/blocks',{method:'POST',body:JSON.stringify({date,time,endTime,label})});
     ALL_BLOCKS=await api('/api/admin/blocks');renderBlocks(ALL_BLOCKS);renderCalendar();$('#blockLabel').value='';
-    showToast('Période bloquée : '+time+' → '+endTime+'.');
+    closeBlockPeriod(); showToast('Période bloquée : '+time+' → '+endTime+'.');
   }catch(e){showToast(e.message,'error');}finally{button.disabled=false;}
 };
 $('#clearBtn').onclick = () => render();
