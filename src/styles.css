@@ -2723,3 +2723,71 @@ body {
 @media(max-width:1050px){.dashboard-main-grid{grid-template-columns:minmax(0,1fr)}.dashboard-main-grid .admin-calendar-card{grid-column:1}.dashboard-agenda-card{grid-column:1}.dashboard-stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:760px){.admin-wrap{width:calc(100% - 32px);padding-top:24px}.admin-page-heading{align-items:flex-start;flex-direction:column}.admin-quick-actions{width:100%;justify-content:flex-start}.admin-quick-actions .btn{flex:1}.dashboard-stats{gap:9px}.dashboard-stat{padding:14px}.dashboard-stat strong{font-size:24px}.dashboard-main-grid .admin-calendar-card .calendar-day{min-height:76px;padding:6px 4px;gap:4px}.dashboard-main-grid .admin-calendar-card .calendar-day-number{width:23px;height:23px;font-size:11px}.dashboard-main-grid .admin-calendar-card .calendar-event{font-size:9px;padding:3px}.bookings-modal-panel,.notifications-modal-panel{padding:18px 14px;max-height:calc(100vh - 20px)}}
 @media(max-width:520px){.admin-quick-actions{display:grid;grid-template-columns:44px 1fr 1fr}.admin-quick-actions #openManualBooking{grid-column:2/4}.agenda-item{grid-template-columns:65px minmax(0,1fr);gap:9px}.agenda-status{grid-column:2;justify-self:start}.dashboard-stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+
+/* Mobile admin polish: consistent rhythm, compact controls and aligned calendar */
+@media(max-width:760px){
+  .admin-wrap{width:calc(100% - 28px);padding:22px 0 42px}
+  .admin-page-heading{position:relative;display:block;margin-bottom:18px;padding-right:54px}
+  .admin-page-heading h1{font-size:29px;line-height:1.15;margin-top:6px}
+  .admin-quick-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;width:100%;margin-top:18px}
+  .admin-quick-actions .icon-action{position:absolute;top:0;right:0;width:42px;height:42px;font-size:19px}
+  .admin-quick-actions .btn{display:flex;align-items:center;justify-content:center;min-width:0;min-height:48px;padding:10px 9px;font-size:13px;line-height:1.25;text-align:center;white-space:normal}
+  .admin-quick-actions #openManualBooking{grid-column:1/-1}
+  .dashboard-stats{gap:9px;margin-bottom:14px}
+  .dashboard-stat{padding:14px 13px;border-radius:7px;min-height:112px}
+  .dashboard-stat span{font-size:11px;line-height:1.35;min-height:30px}
+  .dashboard-stat strong{font-size:25px;margin:7px 0 4px;line-height:1.1}
+  .dashboard-stat small{font-size:10px;line-height:1.3}
+  .dashboard-main-grid{gap:14px}
+  .dashboard-main-grid .admin-calendar-card,.dashboard-agenda-card{padding:16px 14px;border-radius:7px}
+  .dashboard-main-grid .admin-calendar-card .admin-section-heading{display:flex;flex-direction:column;align-items:stretch;gap:12px;margin-bottom:4px}
+  .dashboard-main-grid .admin-calendar-card .admin-section-heading h3{font-size:19px;line-height:1.25;margin:5px 0 0}
+  .calendar-navigation{display:grid;grid-template-columns:42px minmax(0,1fr) 42px;align-items:center;gap:8px;width:100%;flex-wrap:nowrap}
+  .calendar-navigation .btn{display:flex;align-items:center;justify-content:center;min-width:0;min-height:40px;padding:8px 7px;font-size:12px;line-height:1;white-space:nowrap}
+  .calendar-month-title{font-size:17px;margin:13px 0 10px}
+  .dashboard-main-grid .admin-calendar-card .calendar-weekday{padding:9px 2px;font-size:9px;letter-spacing:.02em}
+  .dashboard-main-grid .admin-calendar-card .calendar-day{min-height:68px;padding:6px 3px;gap:4px}
+  .dashboard-main-grid .admin-calendar-card .calendar-day-number{width:22px;height:22px;font-size:10px}
+  .dashboard-main-grid .admin-calendar-card .calendar-event{font-size:8px;line-height:1.2;padding:3px 2px;border-left-width:1px}
+  .dashboard-main-grid .admin-calendar-card .calendar-more{font-size:8px;padding-left:1px}
+  .dashboard-main-grid .admin-calendar-card .calendar-legend{gap:8px 12px;margin-top:12px}
+  .dashboard-main-grid .admin-calendar-card .calendar-legend span{font-size:10px}
+  .dashboard-agenda-card .admin-section-heading{align-items:center;gap:8px;margin-bottom:8px}
+  .dashboard-agenda-card .admin-section-heading h3{font-size:19px;line-height:1.25}
+  .agenda-item{grid-template-columns:66px minmax(0,1fr);gap:8px;padding:13px 0}
+  .agenda-date strong{font-size:14px}
+  .agenda-date span,.agenda-details span{font-size:10px}
+  .agenda-details strong{font-size:12px}
+  .agenda-status{grid-column:2;justify-self:start;font-size:10px}
+  .agenda-empty{padding:32px 12px}
+  .bookings-modal-panel,.notifications-modal-panel,.block-period-modal-panel,.manual-booking-modal-panel{width:100%;max-width:100%;max-height:calc(100dvh - 20px);padding:18px 15px;border-radius:10px;overscroll-behavior:contain}
+  .manual-booking-modal{padding:10px;align-items:center}
+  .manual-booking-modal-heading{align-items:center;gap:10px;margin-bottom:14px}
+  .manual-booking-modal-heading h2,.bookings-modal-panel h2,.notifications-modal-panel h2,.block-period-modal-panel h2{font-size:22px;line-height:1.2}
+  .bookings-modal-panel .admin-section-heading,.notifications-modal-panel .admin-section-heading{align-items:center;gap:10px;margin-bottom:12px}
+  .bookings-modal-panel .admin-section-heading h3,.notifications-modal-panel .admin-section-heading h3{font-size:17px}
+  .bookings-modal-panel .admin-section-heading .btn,.notifications-modal-panel .admin-section-heading .btn{min-height:40px;padding:8px 11px;font-size:12px}
+  .booking-filters{display:grid;grid-template-columns:1fr;align-items:stretch;gap:12px;margin:14px 0}
+  .booking-filters label,.booking-filters .booking-search{min-width:0;width:100%;gap:6px;font-size:12px}
+  .booking-filters input,.booking-filters select{min-height:44px;padding:10px 11px;font-size:13px}
+  .bookings-modal-panel .booking-table-wrap{max-width:100%;border-radius:5px}
+  .bookings-modal-panel .booking-table{min-width:740px;font-size:12px}
+  .bookings-modal-panel .booking-table th{padding:10px 9px;font-size:9px}
+  .bookings-modal-panel .booking-table td{padding:11px 9px}
+  .booking-pagination{gap:8px;justify-content:space-between;flex-wrap:wrap;font-size:11px}
+  .booking-pagination .btn{padding:8px 9px;font-size:11px}
+  .notifications-modal-panel .email-summary{gap:7px;margin:12px 0 16px}
+  .notifications-modal-panel .email-summary>div{padding:11px 9px}
+  .notifications-modal-panel .email-summary strong{font-size:19px}
+  .notifications-modal-panel .email-summary span{font-size:10px}
+}
+@media(max-width:390px){
+  .admin-wrap{width:calc(100% - 24px)}
+  .admin-quick-actions .btn{font-size:12px;padding:9px 7px}
+  .dashboard-stat{padding:12px 10px}
+  .dashboard-main-grid .admin-calendar-card,.dashboard-agenda-card{padding:14px 11px}
+  .dashboard-main-grid .admin-calendar-card .calendar-day{min-height:62px}
+  .dashboard-main-grid .admin-calendar-card .calendar-event{font-size:7px}
+  .calendar-navigation{grid-template-columns:38px minmax(0,1fr) 38px;gap:6px}
+}
