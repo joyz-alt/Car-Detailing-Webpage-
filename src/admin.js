@@ -111,7 +111,7 @@ function renderBookingDetails(r) {
       '<button class="btn btn-primary btn-small" data-action="payment" data-id="' + escapeHtml(r.id) + '">Enregistrer le paiement et envoyer le reçu</button>' +
       '<button class="btn btn-secondary btn-small" data-action="decline" data-id="' + escapeHtml(r.id) + '">Refuser la demande</button></div>' : '';
   return '<div class="booking-detail-layout"><div class="booking-detail-info">' +
-    '<p><strong>Contact :</strong> ' + escapeHtml(r.phone) + ' · ' + escapeHtml(r.email) + '</p>' +
+    '<p><strong>Contact :</strong> ' + escapeHtml(r.phone || 'Non renseigné') + ' · ' + escapeHtml(r.email || 'Non renseigné') + '</p>' +
     '<p><strong>Adresse :</strong> ' + escapeHtml(r.address) + '</p>' +
     '<p><strong>Véhicule :</strong> ' + escapeHtml(r.vehicle || 'Non renseigné') + '</p>' +
     '<p><strong>Eau :</strong> ' + escapeHtml(r.water || 'Non renseigné') + ' · <strong>Électricité :</strong> ' + escapeHtml(r.electricity || 'Non renseigné') + '</p>' +
@@ -225,7 +225,8 @@ async function sendPayment(id, button) {
     const d = await api('/api/admin/bookings/' + encodeURIComponent(id) + '/payment', {
       method: 'POST', body: JSON.stringify({ service, addons, paymentMethod, customerAgreed: true })
     });
-    if (d.emailSent) showToast('Paiement de ' + d.totalAmount + ' € enregistré. Le reçu a été envoyé.');
+    if (d.emailStatus === 'not_applicable') showToast('Paiement de ' + d.totalAmount + ' € enregistré. Aucun e-mail client renseigné.');
+    else if (d.emailSent) showToast('Paiement de ' + d.totalAmount + ' € enregistré. Le reçu a été envoyé.');
     else showToast('Paiement enregistré. Vérifiez la file des notifications e-mail.');
     await render();
   } catch (e) { showToast(e.message, 'error'); button.disabled = false; }
@@ -309,6 +310,32 @@ $('#blocks').addEventListener('click', async event => {
   try { await api('/api/admin/blocks/' + encodeURIComponent(button.dataset.id), { method: 'DELETE' }); await renderBlocks(await api('/api/admin/blocks')); }
   catch (e) { showToast(e.message, 'error'); }
 });
+
+$('#manualDate').min = new Date().toISOString().slice(0, 10);
+$('#manualService').addEventListener('change', () => {
+  const times = $('#manualService').value === 'Premium' ? ['08:00', '09:00', '13:00', '14:00'] : ['08:00', '09:00', '10:00', '13:00', '14:00', '15:00'];
+  $('#manualTime').innerHTML = times.map(time => '<option>' + time + '</option>').join('');
+});
+$('#manualBookingForm').addEventListener('submit', async event => {
+  event.preventDefault();
+  const button = event.submitter;
+  const payload = {
+    service: $('#manualService').value, date: $('#manualDate').value, time: $('#manualTime').value,
+    address: $('#manualAddress').value, firstName: $('#manualFirstName').value, lastName: $('#manualLastName').value,
+    phone: $('#manualPhone').value, email: $('#manualEmail').value, vehicle: $('#manualVehicle').value,
+    water: $('#manualWater').value, electricity: $('#manualElectricity').value, note: $('#manualNote').value
+  };
+  if (!payload.date) return showToast('Choisissez une date.', 'error');
+  if (!await showConfirm('Créer cette prestation manuellement ? La vérification du périmètre de 25 km sera ignorée, mais le créneau doit rester disponible.')) return;
+  button.disabled = true;
+  try {
+    const result = await api('/api/admin/bookings', { method: 'POST', body: JSON.stringify(payload) });
+    $('#manualBookingForm').reset(); $('#manualDate').min = new Date().toISOString().slice(0, 10);
+    await render(); showToast('Prestation créée' + (result.booking ? ' · ' + result.booking.id : '') + '.');
+  } catch (e) { showToast(e.message, 'error'); }
+  finally { button.disabled = false; }
+});
+
 $('#blockDate').min = new Date().toISOString().slice(0, 10);
 $('#blockBtn').onclick = async () => {
   const date = $('#blockDate').value, time = $('#blockTime').value;

@@ -2600,3 +2600,11 @@ body {
 .email-attention-label{margin:0 0 10px;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
 .email-all-clear{padding:16px;border:1px solid var(--line);background:rgba(255,255,255,.02)}
 @media(max-width:520px){.email-summary{gap:6px}.email-summary>div{padding:10px 8px;gap:6px;flex-direction:column;align-items:flex-start}.email-summary strong{font-size:20px}.email-summary span{font-size:11px}}
+
+/* Manual booking form in the professional dashboard */
+.manual-booking-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin:18px 0}
+.manual-booking-grid label{display:flex;flex-direction:column;gap:7px;font-size:12px;color:var(--muted)}
+.manual-booking-grid input,.manual-booking-grid select,.manual-booking-grid textarea{width:100%;min-width:0;padding:11px 12px;border:1px solid var(--line);border-radius:4px;background:var(--panel2);color:var(--text);font:inherit;font-size:13px}
+.manual-booking-grid .manual-note{grid-column:1/-1}
+.admin-manual-booking form>.form-help{margin:4px 0 16px}
+@media(max-width:620px){.manual-booking-grid{grid-template-columns:1fr}.manual-booking-grid .manual-note{grid-column:auto}}
