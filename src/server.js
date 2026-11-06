@@ -726,6 +726,128 @@ app.delete('/api/admin/blocks/:id', adminGuard, asyncHandler(async (req, res) =>
   res.json({ ok: true });
 }));
 
+
+app.patch('/api/admin/bookings/:id', adminGuard, asyncHandler(async (req, res) => {
+  const body = req.body || {};
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const booking = await getBooking(client, req.params.id, true);
+    if (!booking) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Réservation introuvable.' });
+    }
+
+    const service = text(body.service || booking.service, 30);
+    const date = text(body.date || booking.date, 10);
+    const time = text(body.time || booking.time, 5);
+    const firstName = text(body.firstName == null ? booking.firstName : body.firstName, 100);
+    const lastName = text(body.lastName == null ? booking.lastName : body.lastName, 100);
+    const phone = text(body.phone == null ? booking.phone : body.phone, 40);
+    const email = text(body.email == null ? booking.email : body.email, 254).toLowerCase();
+    const address = text(body.address == null ? booking.address : body.address, 300);
+    const vehicle = text(body.vehicle == null ? booking.vehicle : body.vehicle, 100) || 'Non renseigné';
+    const water = text(body.water == null ? booking.water : body.water, 10) || 'Non renseigné';
+    const electricity = text(body.electricity == null ? booking.electricity : body.electricity, 10) || 'Non renseigné';
+    const condition = text(body.condition == null ? booking.condition : body.condition, 100) || 'Non renseigné';
+    const note = text(body.note == null ? booking.note : body.note, 1500);
+
+    if (!SERVICES[service]) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: 'Choisissez une formule valide.' });
+    }
+    if (!isValidDate(date) || date < parisToday() || !SLOT_RULES[service].includes(time)) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: 'La date ou l’heure ne correspond pas à un créneau proposé pour cette formule.' });
+    }
+    if (!firstName || !lastName || !phone || !address || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: 'Vérifiez le prénom, le nom, le téléphone, l’adresse et l’e-mail.' });
+    }
+    if (booking.status === 'confirmed' && service !== booking.service) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ error: 'La formule d’une prestation déjà payée ne peut pas être modifiée ici. Le règlement enregistré doit rester cohérent avec le reçu.' });
+    }
+
+    // Lock both dates in a stable order before checking the new slot.
+    for (const lockedDate of [...new Set([booking.date, date])].sort()) {
+      await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [lockedDate]);
+    }
+    if (service === 'Premium') {
+      const premium = await client.query(
+        'SELECT 1 FROM bookings WHERE id <> $1 AND booking_date = $2 AND status = ANY($3::text[]) AND service = $4 LIMIT 1',
+        [booking.id, date, ACTIVE_STATUSES, 'Premium']
+      );
+      if (premium.rowCount) {
+        await client.query('ROLLBACK');
+        return res.status(409).json({ error: 'Une autre prestation Premium est déjà prévue ce jour-là.' });
+      }
+    }
+    const duration = SERVICES[service].durationMinutes + BUFFER_MINUTES;
+    const overlap = await client.query(
+      'SELECT 1 FROM bookings WHERE id <> $1 AND booking_date = $2 AND status = ANY($3::text[]) ' +
+      'AND booking_time < ($4::time + ($5 * interval \'1 minute\')) ' +
+      'AND booking_time + (duration_minutes + ' + BUFFER_MINUTES + ') * interval \'1 minute\' > $4::time LIMIT 1',
+      [booking.id, date, ACTIVE_STATUSES, time, duration]
+    );
+    const blocked = await client.query(
+      'SELECT 1 FROM booking_blocks WHERE block_date = $1 ' +
+      'AND block_time < ($2::time + ($3 * interval \'1 minute\')) ' +
+      'AND block_time + interval \'1 hour\' > $2::time LIMIT 1',
+      [date, time, duration]
+    );
+    if (overlap.rowCount || blocked.rowCount) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ error: 'Ce créneau chevauche une autre réservation ou un créneau bloqué.' });
+    }
+
+    await client.query(
+      'UPDATE bookings SET service = $2, booking_date = $3, booking_time = $4, first_name = $5, last_name = $6, ' +
+      'phone = $7, email = $8, address = $9, vehicle = $10, water = $11, electricity = $12, vehicle_condition = $13, note = $14, ' +
+      'amount_eur = CASE WHEN status = \'pending\' THEN $15 ELSE amount_eur END, ' +
+      'duration_minutes = CASE WHEN status = \'pending\' THEN $16 ELSE duration_minutes END, ' +
+      'duration_label = CASE WHEN status = \'pending\' THEN $17 ELSE duration_label END WHERE id = $1',
+      [booking.id, service, date, time, firstName, lastName, phone, email, address, vehicle, water, electricity, condition, note,
+        SERVICES[service].amount, SERVICES[service].durationMinutes, SERVICES[service].durationLabel]
+    );
+    await client.query('COMMIT');
+    res.json({ ok: true });
+  } catch (e) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw e;
+  } finally {
+    client.release();
+  }
+}));
+
+app.delete('/api/admin/bookings/:id', adminGuard, asyncHandler(async (req, res) => {
+  const client = await pool.connect();
+  let photos = [];
+  try {
+    await client.query('BEGIN');
+    const booking = await getBooking(client, req.params.id, true);
+    if (!booking) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Réservation introuvable.' });
+    }
+    const photoResult = await client.query(
+      'SELECT object_key AS "objectKey" FROM booking_photos WHERE booking_id = $1',
+      [booking.id]
+    );
+    photos = photoResult.rows;
+    await client.query('DELETE FROM bookings WHERE id = $1', [booking.id]);
+    await client.query('COMMIT');
+  } catch (e) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw e;
+  } finally {
+    client.release();
+  }
+  // Database rows cascade; remove the corresponding private R2 objects as well.
+  await deleteObjects(photos);
+  res.json({ ok: true, deleted: true });
+}));
+
 app.post('/api/admin/bookings/:id/decline', adminGuard, asyncHandler(async (req, res) => {
   const client = await pool.connect();
   let booking;
