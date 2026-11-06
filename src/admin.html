@@ -62,6 +62,12 @@
           <button class="btn btn-secondary" id="refreshEmails">Actualiser</button>
         </div>
         <p class="empty" id="emailProvider">Vérification de la configuration…</p>
+        <div class="email-summary" aria-live="polite">
+          <div><strong id="emailSentCount">—</strong><span>Envoyés</span></div>
+          <div><strong id="emailPendingCount">—</strong><span>En attente</span></div>
+          <div><strong id="emailFailedCount">—</strong><span>Échecs</span></div>
+        </div>
+        <p class="email-attention-label">Notifications à surveiller</p>
         <ul class="admin-list" id="emailOutbox"></ul>
       </section>
     </div>
