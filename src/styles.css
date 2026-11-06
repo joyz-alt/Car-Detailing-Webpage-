@@ -2580,3 +2580,14 @@ body {
 .admin-dialog-input{display:block;width:100%;margin:0 0 20px;padding:12px 14px;border:1px solid var(--line);border-radius:4px;background:var(--panel2);color:var(--text);font:inherit}
 .admin-dialog-input[hidden]{display:none}.admin-dialog-actions{display:flex;justify-content:flex-end;gap:10px}body.dialog-open{overflow:hidden}
 @media(max-width:520px){.admin-dialog{padding:22px}.admin-dialog-actions{flex-direction:column-reverse}.admin-dialog-actions button{width:100%}.admin-toast{left:16px;right:16px;bottom:16px;max-width:none}}
+
+
+/* Compact email health summary */
+.email-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:18px 0 20px}
+.email-summary>div{display:flex;align-items:center;gap:10px;padding:13px 15px;border:1px solid var(--line);background:var(--panel2);min-width:0}
+.email-summary strong{font-size:22px;color:var(--text);font-weight:600}
+.email-summary span{font-size:12px;color:var(--muted)}
+.email-summary>div:last-child strong{color:#ff8c8c}
+.email-attention-label{margin:0 0 10px;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.email-all-clear{padding:16px;border:1px solid var(--line);background:rgba(255,255,255,.02)}
+@media(max-width:520px){.email-summary{gap:6px}.email-summary>div{padding:10px 8px;gap:6px;flex-direction:column;align-items:flex-start}.email-summary strong{font-size:20px}.email-summary span{font-size:11px}}
