@@ -1,6 +1,8 @@
 const $ = s => document.querySelector(s);
 let ADMIN_KEY = localStorage.getItem('epure_admin_key') || '';
 let ALL_BOOKINGS = [];
+let CURRENT_PAGE = 1;
+const PAGE_SIZE = 25;
 const SERVICE_PRICES = { Essentielle: 79, Premium: 129 };
 function headers(json = false) {
   const h = {};
@@ -91,13 +93,20 @@ function applyBookingFilters() {
     const haystack = [r.id, r.firstName, r.lastName, r.email, r.phone, r.vehicle, r.address, r.service].join(' ').toLocaleLowerCase('fr');
     return (status === 'all' || r.status === status) && (!query || haystack.includes(query));
   });
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  CURRENT_PAGE = Math.min(CURRENT_PAGE, totalPages);
+  const start = (CURRENT_PAGE - 1) * PAGE_SIZE;
+  const pageRows = filtered.slice(start, start + PAGE_SIZE);
   $('#bookingCount').textContent = filtered.length + ' réservation(s) affichée(s) sur ' + ALL_BOOKINGS.length;
+  $('#bookingPageLabel').textContent = filtered.length ? 'Page ' + CURRENT_PAGE + ' / ' + totalPages : 'Page 0 / 0';
+  $('#bookingPrev').disabled = CURRENT_PAGE <= 1 || !filtered.length;
+  $('#bookingNext').disabled = CURRENT_PAGE >= totalPages || !filtered.length;
   const box = $('#bookings');
   if (!filtered.length) {
     box.innerHTML = '<tr><td colspan="6" class="empty">Aucune réservation ne correspond à votre recherche.</td></tr>';
     return;
   }
-  box.innerHTML = filtered.map(r =>
+  box.innerHTML = pageRows.map(r =>
     '<tr class="booking-table-row">' +
     '<td><strong>' + escapeHtml(r.date) + '</strong><br>' + escapeHtml(r.time) + '</td>' +
     '<td><strong>' + escapeHtml(r.firstName) + ' ' + escapeHtml(r.lastName) + '</strong><br><span class="table-subtext">' + escapeHtml(r.phone) + '</span></td>' +
@@ -107,7 +116,7 @@ function applyBookingFilters() {
     '<button class="btn btn-danger btn-small" data-action="delete-booking" data-id="' + escapeHtml(r.id) + '">Supprimer</button></div></td></tr>' +
     '<tr class="booking-detail-row" id="details-' + escapeHtml(r.id) + '" hidden><td colspan="6">' + renderBookingDetails(r) + '</td></tr>'
   ).join('');
-  for (const r of filtered) {
+  for (const r of pageRows) {
     const detail = $('#details-' + CSS.escape(r.id));
     const form = detail?.querySelector('[data-edit-form]');
     if (form) {
@@ -252,8 +261,10 @@ $('#blockBtn').onclick = async () => {
 };
 $('#clearBtn').onclick = () => render();
 $('#refreshEmails').onclick = () => renderNotifications();
-$('#bookingSearch').addEventListener('input', applyBookingFilters);
-$('#bookingStatus').addEventListener('change', applyBookingFilters);
+$('#bookingSearch').addEventListener('input', () => { CURRENT_PAGE = 1; applyBookingFilters(); });
+$('#bookingStatus').addEventListener('change', () => { CURRENT_PAGE = 1; applyBookingFilters(); });
+$('#bookingPrev').addEventListener('click', () => { CURRENT_PAGE = Math.max(1, CURRENT_PAGE - 1); applyBookingFilters(); });
+$('#bookingNext').addEventListener('click', () => { CURRENT_PAGE += 1; applyBookingFilters(); });
 if (!ADMIN_KEY) {
   ADMIN_KEY = prompt('Clé administrateur (ADMIN_KEY) :') || '';
   if (ADMIN_KEY) localStorage.setItem('epure_admin_key', ADMIN_KEY);
