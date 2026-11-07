@@ -366,8 +366,13 @@ $('#bookings').addEventListener('click', async event => {
   }
   if (action === 'cancel-edit') {
     const row = button.closest('.booking-detail-row');
-    const form = row?.querySelector('[data-edit-form]');
-    if (form) form.reset();
+    if (row) {
+      row.hidden = true;
+      const bookingId = row.id.replace(/^details-/, '');
+      const toggle = $('#bookings button[data-action="toggle-details"][data-id="' + CSS.escape(bookingId) + '"]');
+      if (toggle) toggle.textContent = 'Détails / modifier';
+    }
+    showToast('Modifications annulées.');
   }
   if (action === 'remove-block') {
     try { await api('/api/admin/blocks/' + encodeURIComponent(id), { method: 'DELETE' }); ALL_BLOCKS = await api('/api/admin/blocks'); renderBlocks(ALL_BLOCKS); renderCalendar(); }
