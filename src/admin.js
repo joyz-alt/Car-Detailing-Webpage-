@@ -332,6 +332,9 @@ async function saveBooking(form) {
     await api('/api/admin/bookings/' + encodeURIComponent(id), { method: 'PATCH', body: JSON.stringify(values) });
     showToast('Réservation mise à jour.');
     await render();
+    // Keep the planning and dashboard summary in sync with the saved booking.
+    renderCalendar();
+    renderDashboardOverview();
     const row = $('#details-' + CSS.escape(id));
     if (row) row.hidden = false;
   } catch (e) { showToast(e.message, 'error'); }
@@ -345,6 +348,9 @@ async function deleteBooking(id) {
     await api('/api/admin/bookings/' + encodeURIComponent(id), { method: 'DELETE' });
     ALL_BOOKINGS = ALL_BOOKINGS.filter(item => item.id !== id);
     applyBookingFilters();
+    // Deleting from the bookings list must also refresh the calendar and KPI/agenda panels.
+    renderCalendar();
+    renderDashboardOverview();
     showToast('Réservation supprimée.');
   } catch (e) { showToast(e.message, 'error'); }
 }
