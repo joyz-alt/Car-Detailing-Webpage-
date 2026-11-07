@@ -2931,3 +2931,103 @@ body {
 .social-links-footer a{width:34px;height:34px}
 .social-links-footer svg{width:15px;height:15px}
 @media(max-width:700px){.social-links-top{margin-top:18px}.footer-social{grid-column:1/-1}}
+
+
+/* Refined homepage social spacing and a more deliberate, compact footer layout. */
+.social-links-top {
+  margin-bottom: 24px;
+}
+.footer {
+  grid-template-columns: minmax(260px, 1.25fr) minmax(280px, 1fr) auto;
+  align-items: center;
+  column-gap: clamp(28px, 5vw, 76px);
+  row-gap: 18px;
+  padding: 30px 4vw 24px;
+}
+.footer > div:first-child {
+  min-width: 0;
+}
+.footer > div:first-child .brand {
+  display: inline-flex;
+  align-items: center;
+}
+.footer p {
+  max-width: 340px;
+  margin: 10px 0 0;
+  line-height: 1.5;
+}
+.footer-links {
+  display: grid;
+  grid-template-columns: repeat(2, max-content);
+  align-content: center;
+  justify-content: start;
+  gap: 12px 24px;
+  line-height: 1.4;
+}
+.footer-links a {
+  white-space: nowrap;
+  transition: color .2s ease;
+}
+.footer-links a:hover {
+  color: var(--accent);
+}
+.footer-social {
+  justify-self: end;
+  gap: 10px;
+  white-space: nowrap;
+}
+.footer-social-title {
+  font-size: 11px;
+}
+.footer-copyright {
+  grid-column: 1 / -1;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255,255,255,.07);
+  font-size: 11px;
+}
+@media (max-width: 850px) {
+  .footer {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+    gap: 22px 28px;
+    padding: 28px 5vw 90px;
+  }
+  .footer-links {
+    grid-column: 1;
+    grid-row: 2;
+  }
+  .footer-social {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    justify-self: end;
+  }
+  .footer-copyright {
+    grid-column: 1 / -1;
+  }
+}
+@media (max-width: 520px) {
+  .social-links-top {
+    margin-top: 20px;
+    margin-bottom: 30px;
+  }
+  .footer {
+    grid-template-columns: 1fr;
+    gap: 20px;
+    padding: 26px 22px 100px;
+  }
+  .footer-links {
+    grid-column: 1;
+    grid-row: auto;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px 16px;
+  }
+  .footer-social {
+    grid-column: 1;
+    grid-row: auto;
+    justify-self: start;
+  }
+  .footer-copyright {
+    grid-column: 1;
+    margin-top: 2px;
+  }
+}
