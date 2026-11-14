@@ -1019,13 +1019,13 @@ app.post('/api/admin/bookings/:id/payment', adminGuard, asyncHandler(async (req,
   const addons = [];
   for (const item of rawAddons) {
     const name = text(item && item.name, 100), amount = Number(item && item.amount);
-    if (!name || !Number.isSafeInteger(amount) || amount < 1 || amount > 1000) return res.status(400).json({ error: 'Chaque supplément doit avoir un intitulé et un prix entier compris entre 1 et 1 000 €.' });
+    if (!name || !Number.isSafeInteger(amount) || amount === 0 || Math.abs(amount) > 1000) return res.status(400).json({ error: 'Chaque supplément ou réduction doit avoir un intitulé et un montant entier compris entre -1 000 et 1 000 €, différent de zéro.' });
     addons.push({ name, amount });
   }
   const packageDetails = SERVICES[requestedService];
   const paymentItems = [{ name: 'Formule ' + requestedService, amount: packageDetails.amount }, ...addons];
   const totalAmount = paymentItems.reduce((sum, item) => sum + item.amount, 0);
-  if (!Number.isSafeInteger(totalAmount) || totalAmount > 10000) return res.status(400).json({ error: 'Le montant total est invalide.' });
+  if (!Number.isSafeInteger(totalAmount) || totalAmount < 0 || totalAmount > 10000) return res.status(400).json({ error: 'Le montant total doit être compris entre 0 et 10 000 €.' });
 
   const client = await pool.connect();
   let booking;
