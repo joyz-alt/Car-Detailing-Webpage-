@@ -370,36 +370,53 @@ async function initAddressAutocomplete() {
 
   try {
     const configResponse = await fetch('/api/config');
-    if (!configResponse.ok) return;
+    if (!configResponse.ok) throw new Error('Unable to load public site configuration');
     const config = await configResponse.json();
     const apiKey = String(config.googleMapsBrowserApiKey || '').trim();
-    if (!apiKey) return; // Keep the manual address form until the key is configured in Render.
+    if (!apiKey) return; // Manual address fields remain available when no key is configured.
 
+    // Load the Maps JavaScript API using its documented callback. With
+    // loading=async, the script element's onload event can fire before the
+    // Maps API has finished initializing, so wait for Google's callback.
     if (!window.google?.maps?.places?.PlaceAutocompleteElement &&
         typeof window.google?.maps?.importLibrary !== 'function') {
       await new Promise((resolve, reject) => {
+        const callbackName = '__epureAutoGoogleMapsReady';
+        const existingScript = document.querySelector('script[data-epure-google-maps]');
+        if (existingScript) {
+          existingScript.addEventListener('error', () => reject(new Error('Google Maps JavaScript API failed to load')), { once: true });
+          return;
+        }
+
+        window[callbackName] = () => {
+          delete window[callbackName];
+          resolve();
+        };
+
         const script = document.createElement('script');
+        script.dataset.epureGoogleMaps = 'true';
         script.src = 'https://maps.googleapis.com/maps/api/js?key=' +
-          encodeURIComponent(apiKey) + '&v=weekly&loading=async&libraries=places';
+          encodeURIComponent(apiKey) +
+          '&v=weekly&libraries=places&callback=' + callbackName;
         script.async = true;
         script.defer = true;
-        script.onload = resolve;
-        script.onerror = () => reject(new Error('Google Maps JavaScript API failed to load'));
+        script.onerror = () => {
+          delete window[callbackName];
+          reject(new Error('Google Maps JavaScript API failed to load. Check the API key, website restrictions and Maps JavaScript API activation.'));
+        };
         document.head.appendChild(script);
       });
     }
 
-    // The direct script loader exposes the Places library on google.maps.places.
-    // importLibrary is used when available; the namespace fallback supports
-    // browsers/API loader configurations where importLibrary is not exposed.
     let PlaceAutocompleteElement = window.google?.maps?.places?.PlaceAutocompleteElement;
     if (typeof window.google?.maps?.importLibrary === 'function') {
       const placesLibrary = await window.google.maps.importLibrary('places');
       PlaceAutocompleteElement = placesLibrary.PlaceAutocompleteElement || PlaceAutocompleteElement;
     }
     if (typeof PlaceAutocompleteElement !== 'function') {
-      throw new Error('Google Places PlaceAutocompleteElement is unavailable. Check that Places API (New) is enabled for this key.');
+      throw new Error('Google Places PlaceAutocompleteElement is unavailable. Confirm Places API (New) is enabled and the Maps JavaScript API key is authorised for this website.');
     }
+
     const autocomplete = new PlaceAutocompleteElement();
     autocomplete.includedRegionCodes = ['fr'];
     autocomplete.requestedLanguage = 'fr';
