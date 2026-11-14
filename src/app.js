@@ -424,7 +424,9 @@ async function initAddressAutocomplete() {
     Object.assign(autocomplete.style, {
       display: 'block',
       width: '100%',
-      colorScheme: 'dark',
+      // Keep the input dark while forcing readable dark text in Google's
+      // light prediction dropdown.
+      colorScheme: 'light',
       backgroundColor: '#171a1d',
       color: '#f4f0e8',
       border: '1px solid rgba(190, 158, 103, 0.48)',
