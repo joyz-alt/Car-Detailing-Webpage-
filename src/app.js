@@ -375,11 +375,12 @@ async function initAddressAutocomplete() {
     const apiKey = String(config.googleMapsBrowserApiKey || '').trim();
     if (!apiKey) return; // Keep the manual address form until the key is configured in Render.
 
-    if (!window.google?.maps?.importLibrary) {
+    if (!window.google?.maps?.places?.PlaceAutocompleteElement &&
+        typeof window.google?.maps?.importLibrary !== 'function') {
       await new Promise((resolve, reject) => {
         const script = document.createElement('script');
         script.src = 'https://maps.googleapis.com/maps/api/js?key=' +
-          encodeURIComponent(apiKey) + '&v=weekly&loading=async';
+          encodeURIComponent(apiKey) + '&v=weekly&loading=async&libraries=places';
         script.async = true;
         script.defer = true;
         script.onload = resolve;
@@ -388,7 +389,17 @@ async function initAddressAutocomplete() {
       });
     }
 
-    const { PlaceAutocompleteElement } = await google.maps.importLibrary('places');
+    // The direct script loader exposes the Places library on google.maps.places.
+    // importLibrary is used when available; the namespace fallback supports
+    // browsers/API loader configurations where importLibrary is not exposed.
+    let PlaceAutocompleteElement = window.google?.maps?.places?.PlaceAutocompleteElement;
+    if (typeof window.google?.maps?.importLibrary === 'function') {
+      const placesLibrary = await window.google.maps.importLibrary('places');
+      PlaceAutocompleteElement = placesLibrary.PlaceAutocompleteElement || PlaceAutocompleteElement;
+    }
+    if (typeof PlaceAutocompleteElement !== 'function') {
+      throw new Error('Google Places PlaceAutocompleteElement is unavailable. Check that Places API (New) is enabled for this key.');
+    }
     const autocomplete = new PlaceAutocompleteElement();
     autocomplete.includedRegionCodes = ['fr'];
     autocomplete.requestedLanguage = 'fr';
