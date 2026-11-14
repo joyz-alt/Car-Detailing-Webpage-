@@ -871,7 +871,9 @@ app.patch('/api/admin/bookings/:id', adminGuard, asyncHandler(async (req, res) =
       return res.status(400).json({ error: 'Choisissez une formule actuelle valide.' });
     }
     const validTime = serviceDetails ? SLOT_RULES[service].includes(time) : SLOTS.includes(time);
-    if (!isValidDate(date) || date < parisToday() || !validTime) {
+    // Admins may update customer details after a completed appointment.
+    // Keep an existing past booking date editable, but never allow moving a booking to a new past date.
+    if (!isValidDate(date) || (date < parisToday() && date !== booking.date) || !validTime) {
       await client.query('ROLLBACK');
       return res.status(400).json({ error: 'La date ou l’heure ne correspond pas à un créneau proposé pour cette formule.' });
     }
