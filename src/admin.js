@@ -300,29 +300,68 @@ async function renderNotifications() {
 }
 async function sendPayment(id, button) {
   const detail = button.closest('.booking-detail-row');
-  const service = detail?.querySelector('[data-field="service"]')?.value;
+  const service = detail?.querySelector('.payment-config [data-field="service"]')?.value;
   const addonText = detail?.querySelector('[data-field="addons"]')?.value || '';
   const paymentMethod = detail?.querySelector('[data-field="paymentMethod"]')?.value;
+  const editForm = detail?.querySelector('[data-edit-form]');
+  const bookingUpdates = {};
+  if (editForm) {
+    editForm.querySelectorAll('[data-field]').forEach(input => {
+      bookingUpdates[input.dataset.field] = input.value;
+    });
+  }
+
   const addons = [];
   for (const line of addonText.split(/\r?\n/).map(value => value.trim()).filter(Boolean)) {
     const separator = line.lastIndexOf('|');
-    if (separator < 1) return showToast('Format invalide. Utilisez : intitulé | prix en euros.', 'error');
+    if (separator < 1) {
+      showToast('Format de supplément invalide. Utilisez « intitulé | prix » (ex. : Poils d’animaux | 20), ou laissez le champ vide.', 'error');
+      return;
+    }
     const name = line.slice(0, separator).trim(), amountText = line.slice(separator + 1).trim();
-    if (!name || !/^\d+$/.test(amountText)) return showToast('Chaque supplément doit avoir un intitulé et un prix entier en euros.', 'error');
+    if (!name || !/^\d+$/.test(amountText) || Number(amountText) < 1 || Number(amountText) > 1000) {
+      showToast('Chaque supplément doit avoir un intitulé et un prix entier entre 1 et 1 000 €.', 'error');
+      return;
+    }
     addons.push({ name, amount: Number(amountText) });
   }
+
   const methodLabel = paymentMethod === 'card' ? 'carte bancaire' : 'espèces';
-  if (!await showConfirm('Confirmez-vous que le nettoyage est terminé, que le client a accepté la formule et les suppléments, et que le règlement par ' + methodLabel + ' a réellement été reçu ?')) return;
+  if (!await showConfirm(
+    'Confirmez-vous que le nettoyage est terminé, que le client a accepté la formule et les suppléments, et que le règlement par ' +
+    methodLabel + ' a réellement été reçu ?\n\nLes modifications du formulaire client (e-mail, précisions, adresse, etc.) seront enregistrées avant le paiement.'
+  )) return;
+
+  const originalLabel = button.textContent;
   button.disabled = true;
+  let editsSaved = false;
   try {
+    // Persist the customer details edited in the right-hand form first.
+    // The payment endpoint then reads the up-to-date email when preparing the receipt.
+    if (editForm) {
+      button.textContent = 'Enregistrement des modifications…';
+      await api('/api/admin/bookings/' + encodeURIComponent(id), {
+        method: 'PATCH',
+        body: JSON.stringify(bookingUpdates)
+      });
+      editsSaved = true;
+    }
+
+    button.textContent = 'Enregistrement du paiement…';
     const d = await api('/api/admin/bookings/' + encodeURIComponent(id) + '/payment', {
       method: 'POST', body: JSON.stringify({ service, addons, paymentMethod, customerAgreed: true })
     });
+
     if (d.emailStatus === 'not_applicable') showToast('Paiement de ' + d.totalAmount + ' € enregistré. Aucun e-mail client renseigné.');
-    else if (d.emailSent) showToast('Paiement de ' + d.totalAmount + ' € enregistré. Le reçu a été envoyé.');
+    else if (d.emailSent) showToast('Paiement de ' + d.totalAmount + ' € enregistré. Le reçu a été envoyé à ' + (bookingUpdates.email || 'l’adresse enregistrée') + '.');
     else showToast('Paiement enregistré. Vérifiez la file des notifications e-mail.');
     await render();
-  } catch (e) { showToast(e.message, 'error'); button.disabled = false; }
+  } catch (e) {
+    const prefix = editsSaved ? 'Modifications enregistrées, mais paiement non enregistré : ' : '';
+    showToast(prefix + e.message, 'error');
+    button.disabled = false;
+    button.textContent = originalLabel;
+  }
 }
 async function saveBooking(form) {
   const id = form.dataset.editForm;
