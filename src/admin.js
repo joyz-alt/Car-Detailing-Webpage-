@@ -319,7 +319,7 @@ async function sendPayment(id, button) {
       return;
     }
     const name = line.slice(0, separator).trim(), amountText = line.slice(separator + 1).trim();
-    if (!name || !/^\d+$/.test(amountText) || Number(amountText) < 1 || Number(amountText) > 1000) {
+    if (!name || !/^-?\d+$/.test(amountText) || Number(amountText) === 0 || Math.abs(Number(amountText)) > 1000) {
       showToast('Chaque élément doit avoir un intitulé et un montant entier compris entre -1 000 et 1 000 €, différent de zéro.', 'error');
       return;
     }
