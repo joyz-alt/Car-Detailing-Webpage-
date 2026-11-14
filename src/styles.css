@@ -3033,28 +3033,86 @@ body {
 }
 
 
-/* Google Places address autocomplete */
+/* Google Places address autocomplete — styled to match Épure Auto */
 .address-autocomplete-field {
-  margin: 10px 0 18px;
+  margin: 8px 0 20px;
+  padding: 13px 14px 11px;
+  border: 1px solid rgba(190, 158, 103, 0.22);
+  border-radius: 10px;
+  background: linear-gradient(145deg, rgba(190, 158, 103, 0.065), rgba(255, 255, 255, 0.012));
 }
 .address-autocomplete-field[hidden] {
   display: none;
 }
+.address-autocomplete-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 9px;
+}
+.address-autocomplete-heading label {
+  margin: 0;
+  color: #f2eee6;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+.address-autocomplete-badge {
+  flex: 0 0 auto;
+  padding: 4px 7px;
+  border: 1px solid rgba(190, 158, 103, 0.3);
+  border-radius: 999px;
+  color: #c7a873;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
 #addressAutocomplete {
   width: 100%;
-  margin-top: 7px;
+  min-width: 0;
 }
 #addressAutocomplete gmp-place-autocomplete {
   display: block;
   width: 100%;
   min-width: 0;
+  color-scheme: dark;
+  background-color: #171a1d;
+  color: #f4f0e8;
+  border: 1px solid rgba(190, 158, 103, 0.48);
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 14px;
+}
+#addressAutocomplete gmp-place-autocomplete::part(input) {
+  min-height: 46px;
+  color: #f4f0e8;
+  font-family: inherit;
+  font-size: 14px;
+}
+#addressAutocomplete gmp-place-autocomplete::part(prediction-list) {
+  color-scheme: light;
+  border-radius: 8px;
 }
 #addressAutocompleteStatus {
-  margin: 7px 0 0;
+  margin: 8px 1px 0;
+  color: #8d9299;
+  font-size: 11px;
+  line-height: 1.5;
 }
 #addressAutocompleteStatus[data-state="success"] {
   color: #a9c7a6;
 }
 #addressAutocompleteStatus[data-state="error"] {
   color: #e2a19a;
+}
+@media (max-width: 600px) {
+  .address-autocomplete-field {
+    padding: 11px 10px 9px;
+  }
+  .address-autocomplete-heading {
+    align-items: flex-start;
+  }
 }
