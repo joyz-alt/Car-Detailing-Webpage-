@@ -137,7 +137,7 @@ function renderBookingDetails(r) {
   const paymentForm = r.status === 'pending'
     ? '<div class="payment-config"><h4>Enregistrer le paiement après la prestation</h4>' +
       '<label>Formule finale' + serviceOptions(r.service) + '</label>' +
-      '<label>Suppléments (une ligne par extra : intitulé | prix en €)<textarea data-field="addons" rows="3" placeholder="Poils d’animaux | 20&#10;Traitement des taches | 15"></textarea></label>' +
+      '<label>Suppléments / réductions (une ligne par élément : intitulé | montant en €)<textarea data-field="addons" rows="3" placeholder="Poils d’animaux | 20&#10;Remise premiers clients | -20"></textarea><small class="empty">Utilisez un montant positif pour un supplément et négatif pour une remise (ex. : Remise premiers clients | -20).</small></label>' +
       '<label>Mode de règlement<select data-field="paymentMethod"><option value="card">Carte bancaire</option><option value="cash">Espèces</option></select></label>' +
       '<small class="empty">Enregistrez uniquement après avoir réellement reçu le règlement et obtenu l’accord du client sur la formule et les suppléments.</small>' +
       '<button class="btn btn-primary btn-small" data-action="payment" data-id="' + escapeHtml(r.id) + '">Enregistrer le paiement et envoyer le reçu</button>' +
@@ -315,12 +315,12 @@ async function sendPayment(id, button) {
   for (const line of addonText.split(/\r?\n/).map(value => value.trim()).filter(Boolean)) {
     const separator = line.lastIndexOf('|');
     if (separator < 1) {
-      showToast('Format de supplément invalide. Utilisez « intitulé | prix » (ex. : Poils d’animaux | 20), ou laissez le champ vide.', 'error');
+      showToast('Format invalide. Utilisez « intitulé | montant » (ex. : Poils d’animaux | 20 ou Remise premiers clients | -20), ou laissez le champ vide.', 'error');
       return;
     }
     const name = line.slice(0, separator).trim(), amountText = line.slice(separator + 1).trim();
     if (!name || !/^\d+$/.test(amountText) || Number(amountText) < 1 || Number(amountText) > 1000) {
-      showToast('Chaque supplément doit avoir un intitulé et un prix entier entre 1 et 1 000 €.', 'error');
+      showToast('Chaque élément doit avoir un intitulé et un montant entier compris entre -1 000 et 1 000 €, différent de zéro.', 'error');
       return;
     }
     addons.push({ name, amount: Number(amountText) });
@@ -328,7 +328,7 @@ async function sendPayment(id, button) {
 
   const methodLabel = paymentMethod === 'card' ? 'carte bancaire' : 'espèces';
   if (!await showConfirm(
-    'Confirmez-vous que le nettoyage est terminé, que le client a accepté la formule et les suppléments, et que le règlement par ' +
+    'Confirmez-vous que le nettoyage est terminé, que le client a accepté la formule, les suppléments ou réductions, et que le règlement par ' +
     methodLabel + ' a réellement été reçu ?\n\nLes modifications du formulaire client (e-mail, précisions, adresse, etc.) seront enregistrées avant le paiement.'
   )) return;
 
