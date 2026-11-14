@@ -463,7 +463,8 @@ app.get('/health', asyncHandler(async (req, res) => {
 }));
 app.get('/api/config', (req, res) => res.json({
   services: SERVICES, slots: SLOTS,
-  maxPhotos: MAX_PHOTOS, maxPhotoBytes: MAX_PHOTO_BYTES
+  maxPhotos: MAX_PHOTOS, maxPhotoBytes: MAX_PHOTO_BYTES,
+  googleMapsBrowserApiKey: process.env.GOOGLE_MAPS_BROWSER_API_KEY || ''
 }));
 app.get('/api/email-status', adminGuard, asyncHandler(async (req, res) => {
   const counts = await pool.query(
