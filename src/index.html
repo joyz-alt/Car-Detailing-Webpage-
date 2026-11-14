@@ -245,6 +245,11 @@
             <label>E-mail<input id="email" type="email" required autocomplete="email"></label>
             <fieldset class="address-fields">
               <legend>Adresse d’intervention</legend>
+              <div id="addressAutocompleteWrap" class="address-autocomplete-field" hidden>
+                <label>Rechercher votre adresse avec Google</label>
+                <div id="addressAutocomplete"></div>
+                <p class="form-help" id="addressAutocompleteStatus">Sélectionnez une suggestion pour remplir les champs. Vous pourrez ensuite corriger l’adresse si nécessaire.</p>
+              </div>
               <label for="streetAddress">Numéro et nom de rue<input id="streetAddress" required
                   autocomplete="address-line1" placeholder="12 rue des Lilas"></label>
               <div class="two-col">
