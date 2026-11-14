@@ -3058,18 +3058,6 @@ body {
   font-weight: 600;
   letter-spacing: 0.01em;
 }
-.address-autocomplete-badge {
-  flex: 0 0 auto;
-  padding: 4px 7px;
-  border: 1px solid rgba(190, 158, 103, 0.3);
-  border-radius: 999px;
-  color: #c7a873;
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.09em;
-  line-height: 1.2;
-  text-transform: uppercase;
-}
 #addressAutocomplete {
   width: 100%;
   min-width: 0;
@@ -3094,7 +3082,24 @@ body {
 }
 #addressAutocomplete gmp-place-autocomplete::part(prediction-list) {
   color-scheme: light;
+  background-color: #ffffff;
+  border: 1px solid rgba(20, 24, 28, 0.12);
   border-radius: 8px;
+}
+#addressAutocomplete gmp-place-autocomplete::part(prediction-item) {
+  color: #202124;
+}
+#addressAutocomplete gmp-place-autocomplete::part(prediction-item-main-text) {
+  color: #202124;
+}
+#addressAutocomplete gmp-place-autocomplete::part(prediction-item-secondary-text) {
+  color: #5f6368;
+}
+#addressAutocomplete gmp-place-autocomplete::part(prediction-item-match) {
+  color: #202124;
+}
+#addressAutocomplete gmp-place-autocomplete::part(prediction-item-selected) {
+  background-color: #f1f3f4;
 }
 #addressAutocompleteStatus {
   margin: 8px 1px 0;
