@@ -246,9 +246,12 @@
             <fieldset class="address-fields">
               <legend>Adresse d’intervention</legend>
               <div id="addressAutocompleteWrap" class="address-autocomplete-field" hidden>
-                <label>Rechercher votre adresse avec Google</label>
+                <div class="address-autocomplete-heading">
+                  <label for="addressAutocomplete">Trouver mon adresse</label>
+                  <span class="address-autocomplete-badge">Recherche rapide</span>
+                </div>
                 <div id="addressAutocomplete"></div>
-                <p class="form-help" id="addressAutocompleteStatus">Sélectionnez une suggestion pour remplir les champs. Vous pourrez ensuite corriger l’adresse si nécessaire.</p>
+                <p class="form-help" id="addressAutocompleteStatus">Saisissez quelques lettres puis choisissez votre adresse dans les suggestions. Vous pourrez la modifier ensuite.</p>
               </div>
               <label for="streetAddress">Numéro et nom de rue<input id="streetAddress" required
                   autocomplete="address-line1" placeholder="12 rue des Lilas"></label>
