@@ -24,6 +24,7 @@
    - `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`
    - `PUBLIC_URL` — canonical HTTPS website URL
    - `RESEND_API_KEY`, `MAIL_FROM`, `ADMIN_EMAIL` for notifications
+   - `GOOGLE_MAPS_BROWSER_API_KEY` — optional browser key for Google Places address autocomplete. This key is intentionally sent to the public booking page; restrict it to the Maps JavaScript API and Places API (New), and to the website referrers `https://epure-auto.com/*` and `https://www.epure-auto.com/*`. Enable billing and both APIs in Google Cloud. If unset, customers keep using the manual address fields.
    SMTP variables (`SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`) are an optional fallback only on hosts that allow outbound SMTP.
 7. Never commit `.env`, expose secret keys in frontend code, or paste credentials into chats/issues.
 
