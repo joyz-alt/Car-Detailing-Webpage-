@@ -361,6 +361,84 @@ function init() {
 
 init();
 
+// Google Places address autocomplete. The manual address fields remain available
+// as a fallback and are still used by the existing 25 km server-side check.
+async function initAddressAutocomplete() {
+  const wrap = $('#addressAutocompleteWrap');
+  const mount = $('#addressAutocomplete');
+  if (!wrap || !mount) return;
+
+  try {
+    const configResponse = await fetch('/api/config');
+    if (!configResponse.ok) return;
+    const config = await configResponse.json();
+    const apiKey = String(config.googleMapsBrowserApiKey || '').trim();
+    if (!apiKey) return; // Keep the manual address form until the key is configured in Render.
+
+    if (!window.google?.maps?.importLibrary) {
+      await new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = 'https://maps.googleapis.com/maps/api/js?key=' +
+          encodeURIComponent(apiKey) + '&v=weekly&loading=async';
+        script.async = true;
+        script.defer = true;
+        script.onload = resolve;
+        script.onerror = () => reject(new Error('Google Maps JavaScript API failed to load'));
+        document.head.appendChild(script);
+      });
+    }
+
+    const { PlaceAutocompleteElement } = await google.maps.importLibrary('places');
+    const autocomplete = new PlaceAutocompleteElement();
+    autocomplete.includedRegionCodes = ['fr'];
+    autocomplete.requestedLanguage = 'fr';
+    autocomplete.placeholder = 'Commencez à saisir votre adresse…';
+    autocomplete.locationBias = {
+      radius: 50000,
+      center: { lat: 45.64889, lng: 0.17426 }
+    };
+    mount.replaceChildren(autocomplete);
+    wrap.hidden = false;
+
+    autocomplete.addEventListener('gmp-select', async event => {
+      const status = $('#addressAutocompleteStatus');
+      try {
+        const place = event.placePrediction.toPlace();
+        await place.fetchFields({ fields: ['addressComponents', 'formattedAddress'] });
+        const components = place.addressComponents || [];
+        const component = type => components.find(item => item.types?.includes(type))?.longText || '';
+        const streetNumber = component('street_number');
+        const route = component('route');
+        const street = [streetNumber, route].filter(Boolean).join(' ');
+        const postcode = component('postal_code');
+        const city = component('locality') || component('postal_town') ||
+          component('administrative_area_level_3') || component('administrative_area_level_2');
+
+        if (street) $('#streetAddress').value = street;
+        if (postcode) $('#postcode').value = postcode;
+        if (city) $('#city').value = city;
+        if (!street && place.formattedAddress) $('#streetAddress').value = place.formattedAddress;
+
+        if (status) {
+          status.textContent = 'Adresse renseignée. Vérifiez les champs avant de continuer.';
+          status.dataset.state = 'success';
+        }
+      } catch (error) {
+        console.warn('Google address selection failed:', error);
+        if (status) {
+          status.textContent = 'Impossible de récupérer cette adresse. Vous pouvez la saisir manuellement.';
+          status.dataset.state = 'error';
+        }
+      }
+    });
+  } catch (error) {
+    // Autocomplete is an enhancement only: never block manual booking if Google is unavailable.
+    console.warn('Google address autocomplete unavailable:', error);
+  }
+}
+
+initAddressAutocomplete();
+
 
 // Swipe, mouse-drag and arrow controls for the before/after portfolio.
 (() => {
