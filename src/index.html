@@ -235,9 +235,7 @@
           </div>
 
           <div class="form-step" data-step="3">
-            <div class="step-title"><small>ÉTAPE 3/3</small>
-              <h3>Quelques informations</h3>
-            </div>
+            <div class="step-title"><small>ÉTAPE 3/3</small></div>
             <div class="two-col"><label>Prénom<input id="firstName" required
                   autocomplete="given-name"></label><label>Nom<input id="lastName" required
                   autocomplete="family-name"></label></div>
@@ -248,10 +246,9 @@
               <div id="addressAutocompleteWrap" class="address-autocomplete-field" hidden>
                 <div class="address-autocomplete-heading">
                   <label for="addressAutocomplete">Trouver mon adresse</label>
-                  <span class="address-autocomplete-badge">Recherche rapide</span>
                 </div>
                 <div id="addressAutocomplete"></div>
-                <p class="form-help" id="addressAutocompleteStatus">Saisissez quelques lettres puis choisissez votre adresse dans les suggestions. Vous pourrez la modifier ensuite.</p>
+                <p class="form-help" id="addressAutocompleteStatus" aria-live="polite"></p>
               </div>
               <label for="streetAddress">Numéro et nom de rue<input id="streetAddress" required
                   autocomplete="address-line1" placeholder="12 rue des Lilas"></label>
@@ -267,9 +264,7 @@
                 <input id="photos" name="photos" type="file" accept="image/jpeg,image/png,image/webp" multiple
                   aria-describedby="photosHelp">
               </label>
-              <p class="form-help" id="photosHelp">JPG, PNG ou WEBP · 5 photos maximum · 5 Mo par photo. Vous pouvez
-                ajouter les photos en plusieurs fois et retirer celles que vous ne souhaitez pas envoyer. Évitez
-                d’inclure des personnes ou des informations personnelles visibles.</p>
+              <p class="form-help" id="photosHelp">JPG, PNG ou WEBP · 5 photos maximum · 5 Mo par photo.</p>
               <ul id="photoList" class="photo-list" aria-label="Photos sélectionnées" aria-live="polite"></ul>
               <p id="photoCount" class="photo-count" aria-live="polite">Aucune photo sélectionnée.</p>
             </div>
@@ -293,8 +288,6 @@
             </div>
             <div class="form-actions"><button type="button" class="btn btn-secondary back-btn">← Retour</button><button
                 type="submit" class="btn btn-primary">Envoyer ma demande →</button></div>
-            <p class="payment-note">Aucun paiement n’est demandé lors de la réservation. Le règlement sera effectué
-              après le nettoyage, une fois le montant final convenu avec vous.</p>
           </div>
         </form>
       </div>
