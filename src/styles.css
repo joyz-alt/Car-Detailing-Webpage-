@@ -3031,3 +3031,30 @@ body {
     margin-top: 2px;
   }
 }
+
+
+/* Google Places address autocomplete */
+.address-autocomplete-field {
+  margin: 10px 0 18px;
+}
+.address-autocomplete-field[hidden] {
+  display: none;
+}
+#addressAutocomplete {
+  width: 100%;
+  margin-top: 7px;
+}
+#addressAutocomplete gmp-place-autocomplete {
+  display: block;
+  width: 100%;
+  min-width: 0;
+}
+#addressAutocompleteStatus {
+  margin: 7px 0 0;
+}
+#addressAutocompleteStatus[data-state="success"] {
+  color: #a9c7a6;
+}
+#addressAutocompleteStatus[data-state="error"] {
+  color: #e2a19a;
+}
