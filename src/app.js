@@ -418,6 +418,20 @@ async function initAddressAutocomplete() {
     }
 
     const autocomplete = new PlaceAutocompleteElement();
+    autocomplete.classList.add('epure-address-autocomplete');
+    // Style the Google web component itself (Google exposes these CSS properties
+    // specifically for PlaceAutocompleteElement).
+    Object.assign(autocomplete.style, {
+      display: 'block',
+      width: '100%',
+      colorScheme: 'dark',
+      backgroundColor: '#171a1d',
+      color: '#f4f0e8',
+      border: '1px solid rgba(190, 158, 103, 0.48)',
+      borderRadius: '8px',
+      fontFamily: 'inherit',
+      fontSize: '14px'
+    });
     autocomplete.includedRegionCodes = ['fr'];
     autocomplete.requestedLanguage = 'fr';
     autocomplete.placeholder = 'Commencez à saisir votre adresse…';
