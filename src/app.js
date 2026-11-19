@@ -359,7 +359,90 @@ function init() {
   $('#bookingForm')?.addEventListener('submit', submitBooking);
 }
 
-init();
+init();\n
+// Google Analytics — consentement préalable (RGPD / règles CNIL).
+// Le script Google n'est injecté qu'après un choix explicite "Accepter".
+(() => {
+  const CONSENT_KEY = 'epure-auto-analytics-consent';
+  const TAG_ID = 'GTM-P9BRMXR8';
+  let tagLoaded = false;
+
+  window.dataLayer = window.dataLayer || [];
+  window.gtag = window.gtag || function () { window.dataLayer.push(arguments); };
+  window.gtag('consent', 'default', {
+    analytics_storage: 'denied',
+    ad_storage: 'denied',
+    ad_user_data: 'denied',
+    ad_personalization: 'denied'
+  });
+
+  function loadAnalytics() {
+    if (tagLoaded) return;
+    tagLoaded = true;
+    window.gtag('js', new Date());
+    window.gtag('config', TAG_ID);
+    const script = document.createElement('script');
+    script.async = true;
+    script.src = 'https://www.googletagmanager.com/gtm.js?id=' + encodeURIComponent(TAG_ID);
+    script.dataset.epureAnalytics = 'true';
+    document.head.appendChild(script);
+  }
+
+  function removeAnalyticsCookies() {
+    const names = document.cookie.split(';').map(cookie => cookie.trim().split('=')[0])
+      .filter(name => name === '_ga' || name.startsWith('_ga_'));
+    const domains = ['', location.hostname, '.epure-auto.com'];
+    names.forEach(name => {
+      domains.forEach(domain => {
+        const domainPart = domain ? '; domain=' + domain : '';
+        document.cookie = name + '=; Max-Age=0; path=/' + domainPart + '; SameSite=Lax';
+      });
+    });
+  }
+
+  function closeBanner() {
+    const banner = document.getElementById('cookieConsent');
+    if (banner) banner.hidden = true;
+  }
+
+  function saveChoice(accepted) {
+    try {
+      localStorage.setItem(CONSENT_KEY, accepted ? 'accepted' : 'rejected');
+    } catch (_) { /* Le choix reste appliqué pour la session si le stockage est indisponible. */ }
+
+    window.gtag('consent', 'update', {
+      analytics_storage: accepted ? 'granted' : 'denied',
+      ad_storage: 'denied',
+      ad_user_data: 'denied',
+      ad_personalization: 'denied'
+    });
+
+    if (accepted) loadAnalytics();
+    else removeAnalyticsCookies();
+    closeBanner();
+  }
+
+  function openBanner() {
+    const banner = document.getElementById('cookieConsent');
+    if (!banner) return;
+    banner.hidden = false;
+    document.getElementById('acceptAnalytics')?.focus();
+  }
+
+  document.getElementById('acceptAnalytics')?.addEventListener('click', () => saveChoice(true));
+  document.getElementById('rejectAnalytics')?.addEventListener('click', () => saveChoice(false));
+  document.getElementById('openCookieSettings')?.addEventListener('click', openBanner);
+
+  let savedChoice = null;
+  try { savedChoice = localStorage.getItem(CONSENT_KEY); } catch (_) { /* stockage indisponible */ }
+  if (savedChoice === 'accepted') {
+    window.gtag('consent', 'update', { analytics_storage: 'granted' });
+    loadAnalytics();
+  } else if (savedChoice !== 'rejected') {
+    openBanner();
+  }
+})();
+
 
 // Google Places address autocomplete. The manual address fields remain available
 // as a fallback and are still used by the existing 25 km server-side check.
