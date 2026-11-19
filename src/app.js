@@ -407,7 +407,10 @@ init();\n
 
   function saveChoice(accepted) {
     try {
-      localStorage.setItem(CONSENT_KEY, accepted ? 'accepted' : 'rejected');
+      localStorage.setItem(CONSENT_KEY, JSON.stringify({
+        choice: accepted ? 'accepted' : 'rejected',
+        savedAt: Date.now()
+      }));
     } catch (_) { /* Le choix reste appliqué pour la session si le stockage est indisponible. */ }
 
     window.gtag('consent', 'update', {
@@ -434,7 +437,18 @@ init();\n
   document.getElementById('openCookieSettings')?.addEventListener('click', openBanner);
 
   let savedChoice = null;
-  try { savedChoice = localStorage.getItem(CONSENT_KEY); } catch (_) { /* stockage indisponible */ }
+  try {
+    const stored = localStorage.getItem(CONSENT_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      const maxAge = 180 * 24 * 60 * 60 * 1000;
+      if (parsed.savedAt && Date.now() - parsed.savedAt <= maxAge) {
+        savedChoice = parsed.choice;
+      } else {
+        localStorage.removeItem(CONSENT_KEY);
+      }
+    }
+  } catch (_) { /* stockage indisponible ou ancien format invalide */ }
   if (savedChoice === 'accepted') {
     window.gtag('consent', 'update', { analytics_storage: 'granted' });
     loadAnalytics();
