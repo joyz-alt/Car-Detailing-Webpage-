@@ -3121,3 +3121,92 @@ body {
     align-items: flex-start;
   }
 }
+
+
+/* Cookie consent banner — aligned with Épure Auto's dark and gold identity. */
+.cookie-consent[hidden] { display: none !important; }
+.cookie-consent {
+  position: fixed;
+  z-index: 1000;
+  left: 24px;
+  right: 24px;
+  bottom: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 28px;
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 24px 26px;
+  border: 1px solid rgba(184,154,106,.55);
+  border-radius: 10px;
+  background: rgba(18,21,26,.98);
+  box-shadow: 0 18px 60px rgba(0,0,0,.48);
+  backdrop-filter: blur(18px);
+}
+.cookie-consent-copy { min-width: 0; max-width: 650px; }
+.cookie-consent-eyebrow {
+  margin: 0 0 7px;
+  color: var(--accent);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .18em;
+}
+.cookie-consent h2 {
+  margin: 0 0 7px;
+  font: 700 19px Manrope, sans-serif;
+  letter-spacing: -.02em;
+}
+.cookie-consent-copy > p:not(.cookie-consent-eyebrow) {
+  margin: 0 0 8px;
+  color: #b9bec5;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.cookie-consent-copy > a {
+  color: var(--accent);
+  font-size: 11px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.cookie-consent-actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 9px;
+}
+.cookie-button {
+  min-height: 42px;
+  padding: 10px 15px;
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  font: 700 12px "DM Sans", sans-serif;
+  cursor: pointer;
+  transition: background .2s ease, color .2s ease, transform .2s ease;
+}
+.cookie-button:hover { transform: translateY(-1px); }
+.cookie-button-primary { background: var(--accent); color: #111; }
+.cookie-button-secondary { background: transparent; color: var(--text); }
+.cookie-settings-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+.cookie-settings-link:hover { color: var(--accent); }
+@media (max-width: 680px) {
+  .cookie-consent {
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+    display: block;
+    padding: 19px;
+    border-radius: 9px;
+  }
+  .cookie-consent h2 { font-size: 17px; }
+  .cookie-consent-actions { display: grid; grid-template-columns: 1fr 1fr; margin-top: 16px; }
+  .cookie-button { padding: 11px 8px; font-size: 11px; }
+}
