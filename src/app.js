@@ -359,7 +359,8 @@ function init() {
   $('#bookingForm')?.addEventListener('submit', submitBooking);
 }
 
-init();\n
+init();
+
 // Google Analytics — consentement préalable (RGPD / règles CNIL).
 // Le script Google n'est injecté qu'après un choix explicite "Accepter".
 (() => {
