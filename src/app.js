@@ -365,7 +365,7 @@ init();
 // Le script Google n'est injecté qu'après un choix explicite "Accepter".
 (() => {
   const CONSENT_KEY = 'epure-auto-analytics-consent';
-  const TAG_ID = 'GTM-P9BRMXR8';
+  const MEASUREMENT_ID = 'G-Q7KFSDVMVJ';
   let tagLoaded = false;
 
   window.dataLayer = window.dataLayer || [];
@@ -381,10 +381,10 @@ init();
     if (tagLoaded) return;
     tagLoaded = true;
     window.gtag('js', new Date());
-    window.gtag('config', TAG_ID);
+    window.gtag('config', MEASUREMENT_ID);
     const script = document.createElement('script');
     script.async = true;
-    script.src = 'https://www.googletagmanager.com/gtm.js?id=' + encodeURIComponent(TAG_ID);
+    script.src = 'https://www.googletagmanager.com/gtag/js?id=' + encodeURIComponent(MEASUREMENT_ID);
     script.dataset.epureAnalytics = 'true';
     document.head.appendChild(script);
   }
